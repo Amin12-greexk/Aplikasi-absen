@@ -3,47 +3,54 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Jabatan;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 
 class JabatanController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function index(): JsonResponse
     {
-        //
+        $jabatan = Jabatan::withCount('karyawan')->get();
+        return response()->json($jabatan);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
-        //
+        $validatedData = $request->validate([
+            'nama_jabatan' => 'required|string|max:100|unique:jabatan,nama_jabatan'
+        ]);
+
+        $jabatan = Jabatan::create($validatedData);
+        return response()->json($jabatan, 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    public function show(Jabatan $jabatan): JsonResponse
     {
-        //
+        $jabatan->load(['karyawan.departemenSaatIni']);
+        return response()->json($jabatan);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    public function update(Request $request, Jabatan $jabatan): JsonResponse
     {
-        //
+        $validatedData = $request->validate([
+            'nama_jabatan' => 'required|string|max:100|unique:jabatan,nama_jabatan,' . $jabatan->jabatan_id . ',jabatan_id'
+        ]);
+
+        $jabatan->update($validatedData);
+        return response()->json($jabatan);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function destroy(Jabatan $jabatan): JsonResponse
     {
-        //
+        // Cek apakah masih ada karyawan aktif
+        if ($jabatan->karyawan()->where('status', 'Aktif')->exists()) {
+            return response()->json([
+                'message' => 'Cannot delete position with active employees'
+            ], 422);
+        }
+
+        $jabatan->delete();
+        return response()->json(null, 204);
     }
 }

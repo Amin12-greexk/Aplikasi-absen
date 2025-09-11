@@ -3,47 +3,56 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Departemen;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 
 class DepartemenController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function index(): JsonResponse
     {
-        //
+        $departemen = Departemen::withCount('karyawan')->get();
+        return response()->json($departemen);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
-        //
+        $validatedData = $request->validate([
+            'nama_departemen' => 'required|string|max:100|unique:departemen,nama_departemen',
+            'menggunakan_shift' => 'boolean'
+        ]);
+
+        $departemen = Departemen::create($validatedData);
+        return response()->json($departemen, 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    public function show(Departemen $departemen): JsonResponse
     {
-        //
+        $departemen->load(['karyawan.jabatanSaatIni']);
+        return response()->json($departemen);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    public function update(Request $request, Departemen $departemen): JsonResponse
     {
-        //
+        $validatedData = $request->validate([
+            'nama_departemen' => 'required|string|max:100|unique:departemen,nama_departemen,' . $departemen->departemen_id . ',departemen_id',
+            'menggunakan_shift' => 'boolean'
+        ]);
+
+        $departemen->update($validatedData);
+        return response()->json($departemen);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function destroy(Departemen $departemen): JsonResponse
     {
-        //
+        // Cek apakah masih ada karyawan aktif
+        if ($departemen->karyawan()->where('status', 'Aktif')->exists()) {
+            return response()->json([
+                'message' => 'Cannot delete department with active employees'
+            ], 422);
+        }
+
+        $departemen->delete();
+        return response()->json(null, 204);
     }
 }

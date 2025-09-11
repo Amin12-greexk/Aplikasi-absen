@@ -38,6 +38,16 @@ Route::middleware('auth:sanctum')->group(function () {
         return $request->user();
     });
 
+    Route::apiResource('absensi', AbsensiController::class);
+    Route::get('absensi/laporan/bulanan', [AbsensiController::class, 'getLaporanBulanan']);
+    Route::get('absensi/rekap/{tanggal}', [AbsensiController::class, 'getRekapHarian']);
+    Route::get('jadwal-shift/karyawan/{karyawan_id}/{periode}', [JadwalShiftController::class, 'getJadwalKaryawan']);
+    Route::delete('jadwal-shift', [JadwalShiftController::class, 'deleteJadwal']);
+    
+    // Payroll tambahan  
+    Route::get('payroll', [PayrollController::class, 'getAllPayrolls']);
+    Route::post('payroll/bulk-generate', [PayrollController::class, 'bulkGenerate']);
+
     // CRUD Endpoints
     Route::apiResource('karyawan', KaryawanController::class);
     Route::apiResource('departemen', DepartemenController::class);

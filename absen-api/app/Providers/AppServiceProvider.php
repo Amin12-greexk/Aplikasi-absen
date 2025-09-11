@@ -11,9 +11,12 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Register any application services.
      */
-    public function register(): void
+      public function register(): void
     {
-        //
+        // Register FingerspotService as singleton
+        $this->app->singleton(FingerspotService::class, function ($app) {
+            return new FingerspotService();
+        });
     }
 
     /**

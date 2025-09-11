@@ -3,47 +3,59 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Shift;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 
 class ShiftController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function index(): JsonResponse
     {
-        //
+        $shifts = Shift::all();
+        return response()->json($shifts);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
-        //
+        $validatedData = $request->validate([
+            'kode_shift' => 'required|string|max:10|unique:shift,kode_shift',
+            'jam_masuk' => 'required|date_format:H:i',
+            'jam_pulang' => 'required|date_format:H:i',
+            'hari_berikutnya' => 'boolean'
+        ]);
+
+        $shift = Shift::create($validatedData);
+        return response()->json($shift, 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    public function show(Shift $shift): JsonResponse
     {
-        //
+        return response()->json($shift);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    public function update(Request $request, Shift $shift): JsonResponse
     {
-        //
+        $validatedData = $request->validate([
+            'kode_shift' => 'required|string|max:10|unique:shift,kode_shift,' . $shift->shift_id . ',shift_id',
+            'jam_masuk' => 'required|date_format:H:i',
+            'jam_pulang' => 'required|date_format:H:i',
+            'hari_berikutnya' => 'boolean'
+        ]);
+
+        $shift->update($validatedData);
+        return response()->json($shift);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function destroy(Shift $shift): JsonResponse
     {
-        //
+        // Cek apakah shift masih digunakan dalam jadwal
+        if ($shift->jadwalShift()->exists()) {
+            return response()->json([
+                'message' => 'Cannot delete shift that is still in use'
+            ], 422);
+        }
+
+        $shift->delete();
+        return response()->json(null, 204);
     }
 }

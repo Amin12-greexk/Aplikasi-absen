@@ -10,27 +10,15 @@ use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\JadwalShiftController;
 use App\Http\Controllers\Api\PayrollController;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-*/
-
-// Endpoint untuk Autentikasi (Public)
+// Endpoint publik
 Route::post('/login', [AuthController::class, 'login']);
-
-// Endpoint Webhook dari Fingerspot (Public, perlu validasi token/IP sendiri)
 Route::post('/webhook/fingerspot', function(Request $request) {
-    // Logika untuk menangani data realtime attlog dari mesin
-    // Sebaiknya dibuatkan Controller dan Service khusus untuk ini
     Log::info('Webhook Fingerspot Diterima:', $request->all());
     return response()->json(['message' => 'Webhook received']);
 });
 
-
-// Grup Endpoint yang memerlukan Autentikasi Sanctum
+// Grup Endpoint yang memerlukan Autentikasi
 Route::middleware('auth:sanctum')->group(function () {
-    // Logout
     Route::post('/logout', [AuthController::class, 'logout']);
     
     // Informasi user yang sedang login
@@ -38,28 +26,24 @@ Route::middleware('auth:sanctum')->group(function () {
         return $request->user();
     });
 
-    Route::apiResource('absensi', AbsensiController::class);
-    Route::get('absensi/laporan/bulanan', [AbsensiController::class, 'getLaporanBulanan']);
-    Route::get('absensi/rekap/{tanggal}', [AbsensiController::class, 'getRekapHarian']);
-    Route::get('jadwal-shift/karyawan/{karyawan_id}/{periode}', [JadwalShiftController::class, 'getJadwalKaryawan']);
-    Route::delete('jadwal-shift', [JadwalShiftController::class, 'deleteJadwal']);
+    // Karyawan (dengan permission)
+    Route::get('/karyawan', [KaryawanController::class, 'index'])->middleware('can:view-any-karyawan');
+    Route::post('/karyawan', [KaryawanController::class, 'store'])->middleware('can:create-karyawan');
+    Route::get('/karyawan/{karyawan}', [KaryawanController::class, 'show'])->middleware('can:view-karyawan,karyawan');
+    Route::put('/karyawan/{karyawan}', [KaryawanController::class, 'update'])->middleware('can:update-karyawan,karyawan');
+    Route::delete('/karyawan/{karyawan}', [KaryawanController::class, 'destroy'])->middleware('can:delete-karyawan,karyawan');
     
-    // Payroll tambahan  
-    Route::get('payroll', [PayrollController::class, 'getAllPayrolls']);
-    Route::post('payroll/bulk-generate', [PayrollController::class, 'bulkGenerate']);
+    // Master Data (Departemen, Jabatan, Shift)
+    Route::apiResource('departemen', DepartemenController::class)->middleware('can:manage-master-data');
+    Route::apiResource('jabatan', JabatanController::class)->middleware('can:manage-master-data');
+    Route::apiResource('shift', ShiftController::class)->middleware('can:manage-master-data');
 
-    // CRUD Endpoints
-    Route::apiResource('karyawan', KaryawanController::class);
-    Route::apiResource('departemen', DepartemenController::class);
-    Route::apiResource('jabatan', JabatanController::class);
-    Route::apiResource('shift', ShiftController::class);
+    // Jadwal Shift
+    Route::get('jadwal-shift/{departemen_id}/{tahun}/{bulan}', [JadwalShiftController::class, 'getJadwalByDepartemen']); // Tambahkan middleware jika perlu
+    Route::post('jadwal-shift', [JadwalShiftController::class, 'updateJadwal']); // Tambahkan middleware jika perlu
 
-    // Endpoint khusus untuk Jadwal Shift
-    Route::get('jadwal-shift/{departemen_id}/{tahun}/{bulan}', [JadwalShiftController::class, 'getJadwalByDepartemen']);
-    Route::post('jadwal-shift', [JadwalShiftController::class, 'updateJadwal']);
-
-    // Endpoint untuk Penggajian
-    Route::post('payroll/generate', [PayrollController::class, 'generate']);
-    Route::get('payroll/history/{karyawan_id}', [PayrollController::class, 'getHistory']);
-    Route::get('payroll/slip/{gaji_id}', [PayrollController::class, 'getSlipGaji']);
+    // Penggajian
+    Route::post('payroll/generate', [PayrollController::class, 'generate'])->middleware('can:process-payroll');
+    Route::get('payroll/history/{karyawan_id}', [PayrollController::class, 'getHistory'])->middleware('can:view-any-slip');
+    Route::get('payroll/slip/{gaji_id}', [PayrollController::class, 'getSlipGaji']); // Logika akses slip ada di dalam controller
 });

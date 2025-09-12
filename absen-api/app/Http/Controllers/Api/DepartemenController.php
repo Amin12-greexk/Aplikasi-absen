@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 
 class DepartemenController extends Controller
 {
+    // ... (method index, store, show tidak berubah) ...
     public function index(): JsonResponse
     {
         $departemen = Departemen::withCount('karyawan')->get();
@@ -19,7 +20,7 @@ class DepartemenController extends Controller
     {
         $validatedData = $request->validate([
             'nama_departemen' => 'required|string|max:100|unique:departemen,nama_departemen',
-            'menggunakan_shift' => 'boolean'
+            'menggunakan_shift' => 'required|boolean'
         ]);
 
         $departemen = Departemen::create($validatedData);
@@ -32,20 +33,25 @@ class DepartemenController extends Controller
         return response()->json($departemen);
     }
 
+    /**
+     * Memperbarui data departemen.
+     */
     public function update(Request $request, Departemen $departemen): JsonResponse
     {
+        // --- PERUBAHAN DI SINI ---
+        // Aturan unique sekarang mengabaikan ID departemen saat ini
         $validatedData = $request->validate([
             'nama_departemen' => 'required|string|max:100|unique:departemen,nama_departemen,' . $departemen->departemen_id . ',departemen_id',
-            'menggunakan_shift' => 'boolean'
+            'menggunakan_shift' => 'required|boolean'
         ]);
 
         $departemen->update($validatedData);
         return response()->json($departemen);
     }
 
+    // ... (method destroy tidak berubah) ...
     public function destroy(Departemen $departemen): JsonResponse
     {
-        // Cek apakah masih ada karyawan aktif
         if ($departemen->karyawan()->where('status', 'Aktif')->exists()) {
             return response()->json([
                 'message' => 'Cannot delete department with active employees'

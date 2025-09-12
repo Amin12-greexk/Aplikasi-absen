@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 
 class JabatanController extends Controller
 {
+    // ... (method index, store, show tidak berubah) ...
     public function index(): JsonResponse
     {
         $jabatan = Jabatan::withCount('karyawan')->get();
@@ -30,9 +31,13 @@ class JabatanController extends Controller
         $jabatan->load(['karyawan.departemenSaatIni']);
         return response()->json($jabatan);
     }
-
+    
+    /**
+     * Memperbarui data jabatan.
+     */
     public function update(Request $request, Jabatan $jabatan): JsonResponse
     {
+        // --- PERUBAHAN DI SINI ---
         $validatedData = $request->validate([
             'nama_jabatan' => 'required|string|max:100|unique:jabatan,nama_jabatan,' . $jabatan->jabatan_id . ',jabatan_id'
         ]);
@@ -41,9 +46,9 @@ class JabatanController extends Controller
         return response()->json($jabatan);
     }
 
-    public function destroy(Jabatan $jabatan): JsonResponse
+    // ... (method destroy tidak berubah) ...
+     public function destroy(Jabatan $jabatan): JsonResponse
     {
-        // Cek apakah masih ada karyawan aktif
         if ($jabatan->karyawan()->where('status', 'Aktif')->exists()) {
             return response()->json([
                 'message' => 'Cannot delete position with active employees'

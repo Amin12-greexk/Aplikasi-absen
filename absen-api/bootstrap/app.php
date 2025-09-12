@@ -4,6 +4,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -15,8 +16,17 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         // Konfigurasi middleware di sini jika perlu
     })
+    ->withProviders([ // <-- Tambahkan atau modifikasi blok withProviders
+        \App\Providers\AuthServiceProvider::class, // <-- Daftarkan di sini
+    ])
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+         $exceptions->render(function (AuthenticationException $e, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'message' => 'Unauthenticated.'
+                ], 401);
+            }
+        });
     })
     ->withSchedule(function (Schedule $schedule) { // <-- TAMBAHKAN BLOK INI
         // Jalankan sinkronisasi setiap hari pukul 23:00 (11 malam)

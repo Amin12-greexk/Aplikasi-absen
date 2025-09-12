@@ -5,33 +5,34 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Models\User;
+use App\Models\Karyawan; // Ganti User ke Karyawan
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
     public function login(Request $request): JsonResponse
     {
         $credentials = $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
+            'nik' => 'required|string',
+            'password' => 'required|string',
         ]);
 
-        if (Auth::attempt($credentials)) {
-            $user = Auth::user();
-            // Hapus token lama untuk keamanan
-            $user->tokens()->delete(); 
-            // Buat token baru
-            $token = $user->createToken('auth_token')->plainTextToken;
+        $karyawan = Karyawan::where('nik', $credentials['nik'])->first();
 
-            return response()->json([
-                'access_token' => $token,
-                'token_type' => 'Bearer',
-                'user' => $user
-            ]);
+        if (! $karyawan || ! Hash::check($credentials['password'], $karyawan->password)) {
+            return response()->json(['message' => 'NIK atau Password salah.'], 401);
         }
 
-        return response()->json(['message' => 'Invalid credentials'], 401);
+        // Hapus token lama jika ada, lalu buat yang baru
+        $karyawan->tokens()->delete();
+        $token = $karyawan->createToken('auth_token')->plainTextToken;
+
+        return response()->json([
+            'access_token' => $token,
+            'token_type' => 'Bearer',
+            'user' => $karyawan // Kirim data karyawan yang login
+        ]);
     }
 
     public function logout(Request $request): JsonResponse

@@ -14,8 +14,8 @@ return [
     */
 
     'defaults' => [
-        'guard' => env('AUTH_GUARD', 'web'),
-        'passwords' => env('AUTH_PASSWORD_BROKER', 'users'),
+        'guard' => 'sanctum', // Ubah 'web' menjadi 'sanctum'
+        'passwords' => 'users',
     ],
 
     /*
@@ -31,7 +31,7 @@ return [
     | users are actually retrieved out of your database or other storage
     | system used by the application. Typically, Eloquent is utilized.
     |
-    | Supported: "session"
+    | Supported: "session", "sanctum"
     |
     */
 
@@ -39,6 +39,11 @@ return [
         'web' => [
             'driver' => 'session',
             'provider' => 'users',
+        ],
+
+        'sanctum' => [ // Tambahkan guard sanctum
+            'driver' => 'sanctum',
+            'provider' => 'karyawan',
         ],
     ],
 
@@ -62,7 +67,13 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', App\Models\User::class),
+            'model' => App\Models\User::class,
+        ],
+
+        // Tambahkan provider baru untuk karyawan
+        'karyawan' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\Karyawan::class,
         ],
 
         // 'users' => [

@@ -1,5 +1,5 @@
 <?php
-// app/Console/Commands/SyncFingerprintData.php
+// app/Console/Commands/SyncFingerprintData.php (FIXED VERSION)
 
 namespace App\Console\Commands;
 
@@ -13,21 +13,15 @@ class SyncFingerprintData extends Command
     protected $signature = 'fingerprint:sync {--date=} {--days=1} {--process}';
     protected $description = 'Sync attendance data from fingerprint device';
 
-    protected $fingerspotService;
-    protected $importService;
-
-    public function __construct(FingerspotService $fingerspotService, FingerprintImportService $importService)
-    {
-        parent::__construct();
-        $this->fingerspotService = $fingerspotService;
-        $this->importService = $importService;
-    }
-
     public function handle()
     {
         $this->info('🔄 Starting fingerprint data sync...');
 
         try {
+            // Create services without constructor injection
+            $fingerspotService = new FingerspotService();
+            $importService = new FingerprintImportService();
+
             // Determine date range
             $date = $this->option('date') ? Carbon::parse($this->option('date')) : Carbon::today();
             $days = (int) $this->option('days');
@@ -38,7 +32,7 @@ class SyncFingerprintData extends Command
             $this->info("📅 Syncing data from {$startDate} to {$endDate}");
 
             // Import from device
-            $result = $this->fingerspotService->importAndSaveAttlog($startDate, $endDate);
+            $result = $fingerspotService->importAndSaveAttlog($startDate, $endDate);
             
             $this->info("✅ Imported {$result['imported']} attendance logs");
             
@@ -52,7 +46,7 @@ class SyncFingerprintData extends Command
             // Process logs if requested
             if ($this->option('process')) {
                 $this->info('🔄 Processing unprocessed logs...');
-                $processResult = $this->importService->processUnprocessedLogs();
+                $processResult = $importService->processUnprocessedLogs();
                 
                 $this->info("✅ Processed {$processResult['processed']} logs into attendance records");
                 
@@ -69,6 +63,7 @@ class SyncFingerprintData extends Command
             return 1;
         }
 
+        $this->info('🎉 Fingerprint sync completed successfully!');
         return 0;
     }
 }

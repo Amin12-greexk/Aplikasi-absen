@@ -71,4 +71,16 @@ Route::prefix('gaji-tambahan')->group(function () {
     Route::get('periode/{karyawan_id}/{periode}', [GajiTambahanController::class, 'getPeriode']);
     Route::post('recalculate-all', [GajiTambahanController::class, 'recalculateAll']);
 });
+
+Route::prefix('fingerspot')->group(function () {
+    Route::get('userinfo', [FingerspotIntegrationController::class, 'getUserInfo']);
+    Route::post('register-user', [FingerspotIntegrationController::class, 'registerUser']);
+    Route::delete('remove-user', [FingerspotIntegrationController::class, 'removeUser']);
+    Route::post('sync-all-users', [FingerspotIntegrationController::class, 'syncAllUsers']);
+    Route::post('import-attendance', [FingerspotIntegrationController::class, 'importAttendance']);
+    Route::post('set-time', [FingerspotIntegrationController::class, 'setDeviceTime']);
+    Route::post('restart', [FingerspotIntegrationController::class, 'restartDevice']);
+    Route::get('status', [FingerspotIntegrationController::class, 'getDeviceStatus']);
+});
+
 });

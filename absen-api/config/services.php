@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    'fingerspot' => [
+        'url' => env('FINGERSPOT_API_URL', 'http://192.168.11.24'),
+        'key' => env('FINGERSPOT_API_KEY'),
+        'device_ip' => env('FINGERSPOT_DEVICE_IP', '192.168.11.24'),
+        'device_port' => env('FINGERSPOT_DEVICE_PORT', 80),
+        'timeout' => env('FINGERSPOT_TIMEOUT', 30),
+        'auto_sync_interval' => env('FINGERSPOT_AUTO_SYNC_INTERVAL', 60), // minutes
+    ],
+
 ];

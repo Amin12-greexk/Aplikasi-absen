@@ -46,4 +46,29 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('payroll/generate', [PayrollController::class, 'generate'])->middleware('can:process-payroll');
     Route::get('payroll/history/{karyawan_id}', [PayrollController::class, 'getHistory'])->middleware('can:view-any-slip');
     Route::get('payroll/slip/{gaji_id}', [PayrollController::class, 'getSlipGaji']); // Logika akses slip ada di dalam controller
+
+    Route::prefix('fingerprint')->group(function () {
+    Route::post('import-logs', [FingerprintController::class, 'importAttendanceLog']);
+    Route::post('process-logs', [FingerprintController::class, 'processUnprocessedLogs']);
+    Route::post('set-pin', [FingerprintController::class, 'setPinFingerprint']);
+    Route::get('logs', [FingerprintController::class, 'getAttendanceLogs']);
+    Route::get('summary', [FingerprintController::class, 'getAttendanceSummary']);
+    Route::post('manual-sync', [FingerprintController::class, 'manualSync']); // For testing
+});
+
+// Setting gaji management
+Route::prefix('setting-gaji')->group(function () {
+    Route::get('/', [SettingGajiController::class, 'index']);
+    Route::post('/', [SettingGajiController::class, 'store']);
+    Route::get('/{id}', [SettingGajiController::class, 'show']);
+    Route::put('/{id}', [SettingGajiController::class, 'update']);
+    Route::post('/{id}/activate', [SettingGajiController::class, 'activate']);
+});
+
+// Gaji tambahan calculation
+Route::prefix('gaji-tambahan')->group(function () {
+    Route::post('calculate', [GajiTambahanController::class, 'calculate']);
+    Route::get('periode/{karyawan_id}/{periode}', [GajiTambahanController::class, 'getPeriode']);
+    Route::post('recalculate-all', [GajiTambahanController::class, 'recalculateAll']);
+});
 });

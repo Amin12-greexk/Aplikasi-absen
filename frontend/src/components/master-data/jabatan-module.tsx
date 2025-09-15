@@ -6,7 +6,7 @@ import { Jabatan } from "@/types";
 import { ColumnDef } from "@tanstack/react-table";
 import { MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DataTable } from "@/components/ui/data-table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -49,15 +49,15 @@ const JabatanForm = ({ onSuccess, jabatan, onCancel }: { onSuccess: () => void, 
                 <Input id="nama_jabatan" value={nama} onChange={(e) => setNama(e.target.value)} required disabled={isLoading} />
             </div>
             <DialogFooter>
-                <Button type="button" variant="ghost" onClick={onCancel} disabled={isLoading}>Batal</Button>
-                <Button type="submit" disabled={isLoading}>{isLoading ? "Menyimpan..." : "Simpan"}</Button>
+                 <Button type="button" variant="ghost" onClick={onCancel} disabled={isLoading}>Batal</Button>
+                 <Button type="submit" disabled={isLoading}>{isLoading ? "Menyimpan..." : "Simpan"}</Button>
             </DialogFooter>
         </form>
     );
 };
 
 // --- Komponen Utama Modul ---
-export function JabatanModule() {
+export function JabatanModule() { // <-- Pastikan nama fungsi ini benar
     const [data, setData] = useState<Jabatan[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [dialogOpen, setDialogOpen] = useState(false);

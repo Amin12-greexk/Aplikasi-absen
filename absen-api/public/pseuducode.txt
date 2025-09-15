@@ -1,0 +1,63 @@
+INPUT: 
+  role_karyawan          // "produksi" atau "staff"
+  jenis_hari             // "weekday", "weekend", "tanggal_merah"
+  jam_lembur             // jumlah jam lembur
+  jam_selesai_kerja      // jam pulang kerja (misal 19:00)
+  hadir_6_hari           // true/false → premi gugur jika < 6 hari
+  setting:
+    - premi_produksi
+    - premi_staff
+    - uang_makan_produksi_weekday
+    - uang_makan_produksi_weekend_5_10
+    - uang_makan_produksi_weekend_10_20
+    - uang_makan_staff_weekday
+    - uang_makan_staff_weekend_5_10
+    - uang_makan_staff_weekend_10_20
+    - tarif_lembur_per_jam (bisa beda tiap role)
+
+PROCESS:
+
+1. Hitung upah lembur:
+   IF jenis_hari == "weekday" THEN
+       lembur_pay = jam_lembur * tarif_lembur_per_jam
+   ELSE IF jenis_hari == "weekend" OR jenis_hari == "tanggal_merah" THEN
+       lembur_pay = jam_lembur * tarif_lembur_per_jam * 2
+   END IF
+
+2. Hitung premi:
+   premi = 0
+   IF role_karyawan == "produksi" AND hadir_6_hari == true THEN
+       premi = premi_produksi
+   ELSE IF role_karyawan == "staff" AND hadir_6_hari == true THEN
+       premi = premi_staff
+   END IF
+
+3. Hitung uang makan:
+   uang_makan = 0
+   IF role_karyawan == "produksi" THEN
+       IF jenis_hari == "weekday" AND jam_selesai_kerja >= 19:00 THEN
+           uang_makan = uang_makan_produksi_weekday
+       ELSE IF (jenis_hari == "weekend" OR jenis_hari == "tanggal_merah") THEN
+           IF jam_lembur >= 5 AND jam_lembur <= 10 THEN
+               uang_makan = uang_makan_produksi_weekend_5_10
+           ELSE IF jam_lembur > 10 AND jam_lembur <= 20 THEN
+               uang_makan = uang_makan_produksi_weekend_10_20
+           END IF
+       END IF
+
+   ELSE IF role_karyawan == "staff" THEN
+       IF jenis_hari == "weekday" AND jam_selesai_kerja >= 19:00 THEN
+           uang_makan = uang_makan_staff_weekday
+       ELSE IF (jenis_hari == "weekend" OR jenis_hari == "tanggal_merah") THEN
+           IF jam_lembur >= 5 AND jam_lembur <= 10 THEN
+               uang_makan = uang_makan_staff_weekend_5_10
+           ELSE IF jam_lembur > 10 AND jam_lembur <= 20 THEN
+               uang_makan = uang_makan_staff_weekend_10_20
+           END IF
+       END IF
+   END IF
+
+4. Total gaji tambahan = lembur_pay + premi + uang_makan
+
+OUTPUT:
+   lembur_pay, premi, uang_makan, total_tambahan

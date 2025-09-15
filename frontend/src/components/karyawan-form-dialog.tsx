@@ -133,106 +133,135 @@ export function KaryawanFormDialog({ karyawan, onSuccess, trigger }: KaryawanFor
             <DialogTrigger asChild>
                 {trigger || <Button>Tambah Karyawan</Button>}
             </DialogTrigger>
-            <DialogContent className="sm:max-w-xl">
-                <DialogHeader>
-                    <DialogTitle>{karyawan ? "Edit Karyawan" : "Tambah Karyawan Baru"}</DialogTitle>
-                </DialogHeader>
-                 <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Kolom Kiri */}
-                    <div className="space-y-4">
-                        <div>
-                            <Label htmlFor="nik">NIK</Label>
-                            <Input id="nik" value={formData.nik} onChange={handleChange} required />
-                        </div>
-                        <div>
-                            <Label htmlFor="nama_lengkap">Nama Lengkap</Label>
-                            <Input id="nama_lengkap" value={formData.nama_lengkap} onChange={handleChange} required />
-                        </div>
-                        <div>
-                            <Label htmlFor="email">Email</Label>
-                            <Input id="email" type="email" value={formData.email} onChange={handleChange} required />
-                        </div>
-                        <div>
-                             <Label>Tanggal Masuk</Label>
-                             <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !formData.tanggal_masuk && "text-muted-foreground")}>
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {formData.tanggal_masuk ? format(formData.tanggal_masuk, "PPP") : <span>Pilih tanggal</span>}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={formData.tanggal_masuk} onSelect={(date) => handleDateChange('tanggal_masuk', date)} initialFocus /></PopoverContent>
-                            </Popover>
-                        </div>
-                         <div>
-                            <Label htmlFor="departemen_id_saat_ini">Departemen</Label>
-                             <Select onValueChange={(value) => handleSelectChange('departemen_id_saat_ini', value)} value={String(formData.departemen_id_saat_ini)}>
-                                <SelectTrigger><SelectValue placeholder="Pilih departemen..." /></SelectTrigger>
-                                <SelectContent>{departemenList.map(d => <SelectItem key={d.departemen_id} value={String(d.departemen_id)}>{d.nama_departemen}</SelectItem>)}</SelectContent>
-                            </Select>
-                        </div>
-                         <div>
-                            <Label htmlFor="jabatan_id_saat_ini">Jabatan</Label>
-                             <Select onValueChange={(value) => handleSelectChange('jabatan_id_saat_ini', value)} value={String(formData.jabatan_id_saat_ini)}>
-                                <SelectTrigger><SelectValue placeholder="Pilih jabatan..." /></SelectTrigger>
-                                <SelectContent>{jabatanList.map(j => <SelectItem key={j.jabatan_id} value={String(j.jabatan_id)}>{j.nama_jabatan}</SelectItem>)}</SelectContent>
-                            </Select>
-                        </div>
-                    </div>
+           <DialogContent className="sm:max-w-2xl">
+  <DialogHeader>
+    <DialogTitle>{karyawan ? "Edit Data Karyawan" : "Tambah Karyawan Baru"}</DialogTitle>
+  </DialogHeader>
 
-                    {/* Kolom Kanan */}
-                     <div className="space-y-4">
-                        <div>
-                            <Label htmlFor="tempat_lahir">Tempat Lahir</Label>
-                            <Input id="tempat_lahir" value={formData.tempat_lahir} onChange={handleChange} />
-                        </div>
-                         <div>
-                             <Label>Tanggal Lahir</Label>
-                             <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !formData.tanggal_lahir && "text-muted-foreground")}>
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {formData.tanggal_lahir ? format(formData.tanggal_lahir, "PPP") : <span>Pilih tanggal</span>}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={formData.tanggal_lahir} onSelect={(date) => handleDateChange('tanggal_lahir', date)} /></PopoverContent>
-                            </Popover>
-                        </div>
-                         <div>
-                            <Label htmlFor="jenis_kelamin">Jenis Kelamin</Label>
-                             <Select onValueChange={(value) => handleSelectChange('jenis_kelamin', value)} value={formData.jenis_kelamin}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Laki-laki">Laki-laki</SelectItem>
-                                    <SelectItem value="Perempuan">Perempuan</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div>
-                            <Label htmlFor="status_perkawinan">Status Perkawinan</Label>
-                             <Select onValueChange={(value) => handleSelectChange('status_perkawinan', value)} value={formData.status_perkawinan}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Belum Menikah">Belum Menikah</SelectItem>
-                                    <SelectItem value="Menikah">Menikah</SelectItem>
-                                    <SelectItem value="Cerai">Cerai</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                         <div>
-                            <Label htmlFor="nomor_telepon">Nomor Telepon</Label>
-                            <Input id="nomor_telepon" value={formData.nomor_telepon} onChange={handleChange} />
-                        </div>
-                         <div>
-                            <Label htmlFor="alamat">Alamat</Label>
-                            <Input id="alamat" value={formData.alamat} onChange={handleChange} />
-                        </div>
-                     </div>
-                     <div className="md:col-span-2">
-                        <Button type="submit" className="w-full">Simpan</Button>
-                     </div>
-                </form>
-            </DialogContent>
+  <form onSubmit={handleSubmit} className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+    
+    {/* SECTION: Informasi Pribadi */}
+    <div className="space-y-3">
+      <h3 className="text-sm font-semibold text-gray-700">Informasi Pribadi</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="nik">NIK</Label>
+          <Input id="nik" value={formData.nik} onChange={handleChange} required placeholder="Masukkan NIK" />
+        </div>
+        <div>
+          <Label htmlFor="nama_lengkap">Nama Lengkap</Label>
+          <Input id="nama_lengkap" value={formData.nama_lengkap} onChange={handleChange} required placeholder="Masukkan nama lengkap" />
+        </div>
+        <div>
+          <Label htmlFor="tempat_lahir">Tempat Lahir</Label>
+          <Input id="tempat_lahir" value={formData.tempat_lahir} onChange={handleChange} placeholder="Kota/Kabupaten" />
+        </div>
+        <div>
+          <Label>Tanggal Lahir</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-full justify-start text-left">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {formData.tanggal_lahir ? format(formData.tanggal_lahir, "PPP") : "Pilih tanggal"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar mode="single" selected={formData.tanggal_lahir} onSelect={(date) => handleDateChange("tanggal_lahir", date)} />
+            </PopoverContent>
+          </Popover>
+        </div>
+        <div>
+          <Label>Jenis Kelamin</Label>
+          <Select value={formData.jenis_kelamin} onValueChange={(v) => handleSelectChange("jenis_kelamin", v)}>
+            <SelectTrigger><SelectValue placeholder="Pilih jenis kelamin" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Laki-laki">Laki-laki</SelectItem>
+              <SelectItem value="Perempuan">Perempuan</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>Status Perkawinan</Label>
+          <Select value={formData.status_perkawinan} onValueChange={(v) => handleSelectChange("status_perkawinan", v)}>
+            <SelectTrigger><SelectValue placeholder="Pilih status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Belum Menikah">Belum Menikah</SelectItem>
+              <SelectItem value="Menikah">Menikah</SelectItem>
+              <SelectItem value="Cerai">Cerai</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </div>
+
+    {/* SECTION: Informasi Pekerjaan */}
+    <div className="space-y-3">
+      <h3 className="text-sm font-semibold text-gray-700">Informasi Pekerjaan</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <Label>Tanggal Masuk</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-full justify-start text-left">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {formData.tanggal_masuk ? format(formData.tanggal_masuk, "PPP") : "Pilih tanggal"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar mode="single" selected={formData.tanggal_masuk} onSelect={(date) => handleDateChange("tanggal_masuk", date)} />
+            </PopoverContent>
+          </Popover>
+        </div>
+        <div>
+          <Label>Departemen</Label>
+          <Select value={formData.departemen_id_saat_ini} onValueChange={(v) => handleSelectChange("departemen_id_saat_ini", v)}>
+            <SelectTrigger><SelectValue placeholder="Pilih departemen" /></SelectTrigger>
+            <SelectContent>
+              {departemenList.map((d) => (
+                <SelectItem key={d.departemen_id} value={String(d.departemen_id)}>{d.nama_departemen}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>Jabatan</Label>
+          <Select value={formData.jabatan_id_saat_ini} onValueChange={(v) => handleSelectChange("jabatan_id_saat_ini", v)}>
+            <SelectTrigger><SelectValue placeholder="Pilih jabatan" /></SelectTrigger>
+            <SelectContent>
+              {jabatanList.map((j) => (
+                <SelectItem key={j.jabatan_id} value={String(j.jabatan_id)}>{j.nama_jabatan}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </div>
+
+    {/* SECTION: Kontak & Alamat */}
+    <div className="space-y-3">
+      <h3 className="text-sm font-semibold text-gray-700">Kontak & Alamat</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" type="email" value={formData.email} onChange={handleChange} required placeholder="contoh@email.com" />
+        </div>
+        <div>
+          <Label htmlFor="nomor_telepon">Nomor Telepon</Label>
+          <Input id="nomor_telepon" value={formData.nomor_telepon} onChange={handleChange} placeholder="+62..." />
+        </div>
+        <div className="md:col-span-2">
+          <Label htmlFor="alamat">Alamat</Label>
+          <Input id="alamat" value={formData.alamat} onChange={handleChange} placeholder="Alamat lengkap" />
+        </div>
+      </div>
+    </div>
+
+    {/* Tombol Simpan */}
+    <div className="pt-2">
+      <Button type="submit" className="w-full">💾 Simpan</Button>
+    </div>
+  </form>
+</DialogContent>
         </Dialog>
     )
 }

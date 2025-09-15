@@ -1,5 +1,5 @@
 <?php
-// app/Services/PayrollService.php (UPDATED)
+// app/Services/PayrollService.php (UPDATED dengan periode flexible)
 
 namespace App\Services;
 
@@ -7,6 +7,7 @@ use App\Models\Karyawan;
 use App\Models\RiwayatGaji;
 use App\Models\DetailGaji;
 use App\Models\Absensi;
+use App\Models\PayrollPeriod;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -19,111 +20,101 @@ class PayrollService
         $this->gajiTambahanService = $gajiTambahanService ?: new GajiTambahanService();
     }
 
-    public function generate(int $karyawan_id, string $periode): RiwayatGaji
+    /**
+     * Generate payroll untuk periode flexible
+     */
+    public function generateForPeriod(int $karyawan_id, int $period_id): RiwayatGaji
     {
         $karyawan = Karyawan::findOrFail($karyawan_id);
-        $periodeBulan = Carbon::createFromFormat('Y-m', $periode);
+        $payrollPeriod = PayrollPeriod::findOrFail($period_id);
 
-        // Placeholder untuk aturan gaji, idealnya ini disimpan di database
-        $gajiPokokBulanan = 5000000;
-        $gajiHarian = 150000;
-        $rateLemburPerJam = 25000;
+        if ($payrollPeriod->is_closed) {
+            throw new \Exception('Periode payroll sudah ditutup');
+        }
 
-        return DB::transaction(function () use ($karyawan, $periodeBulan, $gajiPokokBulanan, $gajiHarian, $rateLemburPerJam) {
+        return $this->generatePayrollForDateRange(
+            $karyawan,
+            $payrollPeriod->tanggal_mulai,
+            $payrollPeriod->tanggal_selesai,
+            $payrollPeriod->tipe_periode,
+            $period_id
+        );
+    }
+
+    /**
+     * Generate payroll untuk date range custom
+     */
+    public function generateForDateRange(int $karyawan_id, string $tanggal_mulai, string $tanggal_selesai, string $tipe_periode = 'mingguan'): RiwayatGaji
+    {
+        $karyawan = Karyawan::findOrFail($karyawan_id);
+        $start = Carbon::parse($tanggal_mulai);
+        $end = Carbon::parse($tanggal_selesai);
+
+        return $this->generatePayrollForDateRange($karyawan, $start, $end, $tipe_periode);
+    }
+
+    private function generatePayrollForDateRange(Karyawan $karyawan, Carbon $tanggal_mulai, Carbon $tanggal_selesai, string $tipe_periode, int $period_id = null): RiwayatGaji
+    {
+        return DB::transaction(function () use ($karyawan, $tanggal_mulai, $tanggal_selesai, $tipe_periode, $period_id) {
             
-            $pendapatan = [];
-            $potongan = [];
-            
-            // Hapus riwayat gaji lama jika ada untuk periode ini
+            // Hapus riwayat gaji lama untuk periode yang sama
             RiwayatGaji::where('karyawan_id', $karyawan->karyawan_id)
-                ->where('periode', $periodeBulan->format('Y-m'))
+                ->where('periode_mulai', $tanggal_mulai->format('Y-m-d'))
+                ->where('periode_selesai', $tanggal_selesai->format('Y-m-d'))
                 ->delete();
 
             // Buat record riwayat gaji baru
             $riwayatGaji = RiwayatGaji::create([
                 'karyawan_id' => $karyawan->karyawan_id,
-                'periode' => $periodeBulan->format('Y-m'),
+                'periode' => $this->generatePeriodeString($tanggal_mulai, $tanggal_selesai, $tipe_periode),
+                'tipe_periode' => $tipe_periode,
+                'periode_mulai' => $tanggal_mulai->format('Y-m-d'),
+                'periode_selesai' => $tanggal_selesai->format('Y-m-d'),
+                'period_id' => $period_id
             ]);
 
-            // ===========================================
-            // GAJI POKOK (EXISTING LOGIC)
-            // ===========================================
-            switch ($karyawan->kategori_gaji) {
-                case 'Bulanan':
-                    $pendapatan['Gaji Pokok'] = $gajiPokokBulanan;
-                    break;
-                
-                case 'Harian':
-                    $totalHariMasuk = Absensi::where('karyawan_id', $karyawan->karyawan_id)
-                        ->whereYear('tanggal_absensi', $periodeBulan->year)
-                        ->whereMonth('tanggal_absensi', $periodeBulan->month)
-                        ->whereIn('status', ['Hadir', 'Terlambat'])
-                        ->count();
-                    $pendapatan['Gaji Harian'] = $totalHariMasuk * $gajiHarian;
-                    break;
+            $pendapatan = [];
+            $potongan = [];
 
-                case 'Borongan':
-                    $pendapatan['Gaji Borongan'] = 0; // Contoh
-                    break;
+            // Calculate gaji pokok berdasarkan tipe periode dan kategori
+            $gajiPokok = $this->calculateGajiPokok($karyawan, $tanggal_mulai, $tanggal_selesai, $tipe_periode);
+            if ($gajiPokok > 0) {
+                $pendapatan['Gaji Pokok'] = $gajiPokok;
             }
 
-            // ===========================================
-            // GAJI TAMBAHAN (NEW INTEGRATION)
-            // ===========================================
-            try {
-                $gajiTambahanData = $this->gajiTambahanService->hitungGajiTambahanPeriode(
-                    $karyawan->karyawan_id, 
-                    $periodeBulan->format('Y-m')
-                );
+            // Calculate gaji tambahan (lembur, premi, uang makan)
+            $gajiTambahan = $this->calculateGajiTambahanForPeriod($karyawan, $tanggal_mulai, $tanggal_selesai);
+            $pendapatan = array_merge($pendapatan, $gajiTambahan);
 
-                // Tambahkan komponen gaji tambahan ke pendapatan
-                if ($gajiTambahanData['total_upah_lembur'] > 0) {
-                    $pendapatan['Upah Lembur'] = $gajiTambahanData['total_upah_lembur'];
-                }
+            // Calculate potongan
+            $potongan = $this->calculatePotongan($karyawan, $tipe_periode);
 
-                if ($gajiTambahanData['total_premi'] > 0) {
-                    $pendapatan['Premi Kehadiran'] = $gajiTambahanData['total_premi'];
-                }
-
-                if ($gajiTambahanData['total_uang_makan'] > 0) {
-                    $pendapatan['Uang Makan'] = $gajiTambahanData['total_uang_makan'];
-                }
-
-            } catch (\Exception $e) {
-                // Log error tapi tetap lanjutkan proses payroll
-                \Log::error("Error calculating gaji tambahan for karyawan {$karyawan_id}", [
-                    'error' => $e->getMessage(),
-                    'periode' => $periode
-                ]);
-            }
-
-            // ===========================================
-            // POTONGAN (EXISTING LOGIC)
-            // ===========================================
-            $potongan['BPJS'] = -50000;
-
-            // Simpan semua detail pendapatan
+            // Simpan detail pendapatan
             foreach($pendapatan as $deskripsi => $jumlah) {
-                DetailGaji::create([
-                    'gaji_id' => $riwayatGaji->gaji_id,
-                    'jenis_komponen' => 'Pendapatan',
-                    'deskripsi' => $deskripsi,
-                    'jumlah' => $jumlah,
-                ]);
+                if ($jumlah > 0) {
+                    DetailGaji::create([
+                        'gaji_id' => $riwayatGaji->gaji_id,
+                        'jenis_komponen' => 'Pendapatan',
+                        'deskripsi' => $deskripsi,
+                        'jumlah' => $jumlah,
+                    ]);
+                }
             }
             
-            // Simpan semua detail potongan
+            // Simpan detail potongan
             foreach($potongan as $deskripsi => $jumlah) {
-                DetailGaji::create([
-                    'gaji_id' => $riwayatGaji->gaji_id,
-                    'jenis_komponen' => 'Potongan',
-                    'deskripsi' => $deskripsi,
-                    'jumlah' => abs($jumlah), // Simpan sebagai angka positif
-                ]);
+                if ($jumlah > 0) {
+                    DetailGaji::create([
+                        'gaji_id' => $riwayatGaji->gaji_id,
+                        'jenis_komponen' => 'Potongan',
+                        'deskripsi' => $deskripsi,
+                        'jumlah' => $jumlah,
+                    ]);
+                }
             }
 
             // Hitung dan simpan gaji final
-            $gajiFinal = array_sum($pendapatan) + array_sum($potongan);
+            $gajiFinal = array_sum($pendapatan) - array_sum($potongan);
             $riwayatGaji->update([
                 'gaji_final' => $gajiFinal,
                 'tanggal_pembayaran' => now()
@@ -133,54 +124,99 @@ class PayrollService
         });
     }
 
-    /**
-     * Generate payroll dengan recalculate gaji tambahan
-     */
-    public function generateWithRecalculate(int $karyawan_id, string $periode): RiwayatGaji
+    private function calculateGajiPokok(Karyawan $karyawan, Carbon $tanggal_mulai, Carbon $tanggal_selesai, string $tipe_periode): float
     {
-        // Recalculate gaji tambahan dulu untuk memastikan data terbaru
-        try {
-            $year = substr($periode, 0, 4);
-            $month = substr($periode, 5, 2);
-
-            $absensiList = Absensi::with('karyawan')
-                ->where('karyawan_id', $karyawan_id)
-                ->whereYear('tanggal_absensi', $year)
-                ->whereMonth('tanggal_absensi', $month)
-                ->get();
-
-            foreach ($absensiList as $absensi) {
-                if ($absensi->jam_scan_masuk && $absensi->jam_scan_pulang) {
-                    $jamLembur = $absensi->calculateJamLembur();
-                    $hadirMinimal6Hari = $absensi->karyawan->isMemenuiSyaratPremi($periode);
-
-                    $gajiTambahan = $this->gajiTambahanService->hitungGajiTambahan(
-                        $absensi->karyawan->role_karyawan,
-                        $absensi->jenis_hari,
-                        $jamLembur,
-                        $absensi->jam_scan_pulang,
-                        $hadirMinimal6Hari
-                    );
-
-                    $absensi->update([
-                        'jam_lembur' => $jamLembur,
-                        'hadir_6_hari_periode' => $hadirMinimal6Hari,
-                        'upah_lembur' => $gajiTambahan['lembur_pay'],
-                        'premi' => $gajiTambahan['premi'],
-                        'uang_makan' => $gajiTambahan['uang_makan'],
-                        'total_gaji_tambahan' => $gajiTambahan['total_tambahan']
-                    ]);
+        switch ($karyawan->kategori_gaji) {
+            case 'Bulanan':
+                if ($tipe_periode === 'bulanan') {
+                    return 5000000; // Full monthly salary
+                } else {
+                    // Pro-rate untuk periode partial
+                    $totalDaysInMonth = $tanggal_mulai->daysInMonth;
+                    $workingDays = $tanggal_mulai->diffInDays($tanggal_selesai) + 1;
+                    return (5000000 / $totalDaysInMonth) * $workingDays;
                 }
-            }
-        } catch (\Exception $e) {
-            \Log::error("Error recalculating gaji tambahan", [
-                'karyawan_id' => $karyawan_id,
-                'periode' => $periode,
-                'error' => $e->getMessage()
-            ]);
+                
+            case 'Harian':
+                $totalHariMasuk = Absensi::where('karyawan_id', $karyawan->karyawan_id)
+                    ->whereBetween('tanggal_absensi', [$tanggal_mulai, $tanggal_selesai])
+                    ->whereIn('status', ['Hadir', 'Terlambat'])
+                    ->count();
+                return $totalHariMasuk * 150000;
+                
+            case 'Borongan':
+                // Implementasi custom untuk borongan
+                return 0;
+                
+            default:
+                return 0;
+        }
+    }
+
+    private function calculateGajiTambahanForPeriod(Karyawan $karyawan, Carbon $tanggal_mulai, Carbon $tanggal_selesai): array
+    {
+        $absensiList = Absensi::where('karyawan_id', $karyawan->karyawan_id)
+            ->whereBetween('tanggal_absensi', [$tanggal_mulai, $tanggal_selesai])
+            ->get();
+
+        $totalLembur = 0;
+        $totalPremi = 0;
+        $totalUangMakan = 0;
+
+        foreach ($absensiList as $absensi) {
+            $totalLembur += $absensi->upah_lembur ?? 0;
+            $totalPremi += $absensi->premi ?? 0;
+            $totalUangMakan += $absensi->uang_makan ?? 0;
         }
 
-        // Generate payroll normal
-        return $this->generate($karyawan_id, $periode);
+        $result = [];
+        if ($totalLembur > 0) $result['Upah Lembur'] = $totalLembur;
+        if ($totalPremi > 0) $result['Premi Kehadiran'] = $totalPremi;
+        if ($totalUangMakan > 0) $result['Uang Makan'] = $totalUangMakan;
+
+        return $result;
+    }
+
+    private function calculatePotongan(Karyawan $karyawan, string $tipe_periode): array
+    {
+        $potongan = [];
+        
+        // BPJS - pro-rate untuk periode mingguan/harian
+        $bpjsAmount = 50000;
+        if ($tipe_periode === 'mingguan') {
+            $bpjsAmount = $bpjsAmount / 4; // 1/4 dari bulanan
+        } elseif ($tipe_periode === 'harian') {
+            $bpjsAmount = $bpjsAmount / 30; // 1/30 dari bulanan
+        }
+        
+        $potongan['BPJS'] = $bpjsAmount;
+
+        return $potongan;
+    }
+
+    private function generatePeriodeString(Carbon $tanggal_mulai, Carbon $tanggal_selesai, string $tipe_periode): string
+    {
+        switch ($tipe_periode) {
+            case 'harian':
+                return $tanggal_mulai->format('d M Y');
+            case 'mingguan':
+                return $tanggal_mulai->format('d M') . ' - ' . $tanggal_selesai->format('d M Y');
+            case 'bulanan':
+                return $tanggal_mulai->format('F Y');
+            default:
+                return $tanggal_mulai->format('Y-m-d') . ' to ' . $tanggal_selesai->format('Y-m-d');
+        }
+    }
+
+    // Legacy method untuk backward compatibility
+    public function generate(int $karyawan_id, string $periode): RiwayatGaji
+    {
+        $periodeBulan = Carbon::createFromFormat('Y-m', $periode);
+        return $this->generateForDateRange(
+            $karyawan_id,
+            $periodeBulan->startOfMonth()->format('Y-m-d'),
+            $periodeBulan->endOfMonth()->format('Y-m-d'),
+            'bulanan'
+        );
     }
 }

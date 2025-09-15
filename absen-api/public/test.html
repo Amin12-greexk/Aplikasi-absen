@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laravel API Tester</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .config-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .config-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .config-item label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #495057;
+        }
+
+        .config-item input {
+            padding: 10px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .config-item input:focus {
+            outline: none;
+            border-color: #4facfe;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            min-height: 600px;
+        }
+
+        .sidebar {
+            background: #f8f9fa;
+            border-right: 1px solid #e9ecef;
+            padding: 20px;
+            overflow-y: auto;
+            max-height: 80vh;
+        }
+
+        .endpoint-category {
+            margin-bottom: 20px;
+        }
+
+        .category-title {
+            font-weight: 700;
+            color: #495057;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .endpoint-btn {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 10px;
+            margin-bottom: 5px;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 12px;
+        }
+
+        .endpoint-btn:hover {
+            background: #4facfe;
+            color: white;
+            transform: translateX(5px);
+        }
+
+        .endpoint-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .content-area {
+            padding: 30px;
+            overflow-y: auto;
+            max-height: 80vh;
+        }
+
+        .endpoint-form {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .endpoint-form.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #495057;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .form-group textarea {
+            height: 120px;
+            resize: vertical;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .response-section {
+            margin-top: 30px;
+        }
+
+        .response-tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            cursor: pointer;
+            border-radius: 8px 8px 0 0;
+            margin-right: 5px;
+        }
+
+        .tab-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .response-content {
+            background: #1e1e1e;
+            color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .status-success { background: #d4edda; color: #155724; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .status-warning { background: #fff3cd; color: #856404; }
+
+        .method-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+
+        .method-get { background: #d1ecf1; color: #0c5460; }
+        .method-post { background: #d4edda; color: #155724; }
+        .method-put { background: #fff3cd; color: #856404; }
+        .method-delete { background: #f8d7da; color: #721c24; }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Laravel API Tester - Absensi System</h1>
+            <p>Test your Laravel API endpoints with ease</p>
+        </div>
+
+        <div class="config-section">
+            <div class="config-grid">
+                <div class="config-item">
+                    <label for="baseUrl">Base URL:</label>
+                    <input type="text" id="baseUrl" value="http://localhost:8081/api">
+                </div>
+                <div class="config-item">
+                    <label for="authToken">Auth Token:</label>
+                    <input type="text" id="authToken" value="26|dPPJsEkxU7My0n3RxUCAQBY088N4uka54Y2aoq0fa17f7543">
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="sidebar">
+                <div class="endpoint-category">
+                    <div class="category-title">🔐 Authentication</div>
+                    <button class="endpoint-btn" data-endpoint="login">
+                        <span class="method-badge method-post">POST</span>Login
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="user">
+                        <span class="method-badge method-get">GET</span>Get User
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="logout">
+                        <span class="method-badge method-post">POST</span>Logout
+                    </button>
+                </div>
+
+                <div class="endpoint-category">
+                    <div class="category-title">👥 Karyawan Management</div>
+                    <button class="endpoint-btn" data-endpoint="karyawan-list">
+                        <span class="method-badge method-get">GET</span>List Karyawan
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="karyawan-create">
+                        <span class="method-badge method-post">POST</span>Create Karyawan
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="karyawan-show">
+                        <span class="method-badge method-get">GET</span>Show Karyawan
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="karyawan-update">
+                        <span class="method-badge method-put">PUT</span>Update Karyawan
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="karyawan-delete">
+                        <span class="method-badge method-delete">DEL</span>Delete Karyawan
+                    </button>
+                </div>
+
+                <div class="endpoint-category">
+                    <div class="category-title">🏢 Master Data</div>
+                    <button class="endpoint-btn" data-endpoint="departemen-list">
+                        <span class="method-badge method-get">GET</span>List Departemen
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="departemen-create">
+                        <span class="method-badge method-post">POST</span>Create Departemen
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="jabatan-list">
+                        <span class="method-badge method-get">GET</span>List Jabatan
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="jabatan-create">
+                        <span class="method-badge method-post">POST</span>Create Jabatan
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="shift-list">
+                        <span class="method-badge method-get">GET</span>List Shift
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="shift-create">
+                        <span class="method-badge method-post">POST</span>Create Shift
+                    </button>
+                </div>
+
+                <div class="endpoint-category">
+                    <div class="category-title">📅 Jadwal Shift</div>
+                    <button class="endpoint-btn" data-endpoint="jadwal-get">
+                        <span class="method-badge method-get">GET</span>Get Jadwal by Dept
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="jadwal-update">
+                        <span class="method-badge method-post">POST</span>Update Jadwal
+                    </button>
+                </div>
+
+                <div class="endpoint-category">
+                    <div class="category-title">👆 Fingerprint</div>
+                    <button class="endpoint-btn" data-endpoint="fingerprint-logs">
+                        <span class="method-badge method-get">GET</span>Attendance Logs
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="fingerprint-summary">
+                        <span class="method-badge method-get">GET</span>Summary
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="fingerprint-import">
+                        <span class="method-badge method-post">POST</span>Import Logs
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="fingerprint-process">
+                        <span class="method-badge method-post">POST</span>Process Logs
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="fingerprint-set-pin">
+                        <span class="method-badge method-post">POST</span>Set PIN
+                    </button>
+                </div>
+
+                <div class="endpoint-category">
+                    <div class="category-title">🤖 Fingerspot Device</div>
+                    <button class="endpoint-btn" data-endpoint="fingerspot-status">
+                        <span class="method-badge method-get">GET</span>Device Status
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="fingerspot-userinfo">
+                        <span class="method-badge method-get">GET</span>Get User Info
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="fingerspot-register">
+                        <span class="method-badge method-post">POST</span>Register User
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="fingerspot-remove">
+                        <span class="method-badge method-delete">DEL</span>Remove User
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="fingerspot-sync">
+                        <span class="method-badge method-post">POST</span>Sync All Users
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="fingerspot-import-attendance">
+                        <span class="method-badge method-post">POST</span>Import Attendance
+                    </button>
+                </div>
+
+                <div class="endpoint-category">
+                    <div class="category-title">💰 Payroll & Gaji</div>
+                    <button class="endpoint-btn" data-endpoint="payroll-generate">
+                        <span class="method-badge method-post">POST</span>Generate Payroll
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="payroll-history">
+                        <span class="method-badge method-get">GET</span>Payroll History
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="payroll-slip">
+                        <span class="method-badge method-get">GET</span>Slip Gaji
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="setting-gaji-list">
+                        <span class="method-badge method-get">GET</span>Setting Gaji
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="setting-gaji-create">
+                        <span class="method-badge method-post">POST</span>Create Setting
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="setting-gaji-active">
+                        <span class="method-badge method-get">GET</span>Active Setting
+                    </button>
+                </div>
+
+                <div class="endpoint-category">
+                    <div class="category-title">💸 Gaji Tambahan</div>
+                    <button class="endpoint-btn" data-endpoint="gaji-tambahan-calculate">
+                        <span class="method-badge method-post">POST</span>Calculate
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="gaji-tambahan-periode">
+                        <span class="method-badge method-get">GET</span>Get Periode
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="gaji-tambahan-recalculate">
+                        <span class="method-badge method-post">POST</span>Recalculate All
+                    </button>
+                    <button class="endpoint-btn" data-endpoint="gaji-tambahan-summary">
+                        <span class="method-badge method-get">GET</span>Summary by Dept
+                    </button>
+                </div>
+            </div>
+
+            <div class="content-area">
+                <!-- Login Form -->
+                <div class="endpoint-form" id="login">
+                    <h2>🔐 Login</h2>
+                    <div class="form-group">
+                        <label>NIK:</label>
+                        <input type="text" id="login-nik" value="ADMIN001">
+                        <div class="help-text">Enter your NIK (employee ID)</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Password:</label>
+                        <input type="password" id="login-password" value="tunasestaADMIN001">
+                        <div class="help-text">Default format: tunasesta + NIK</div>
+                    </div>
+                    <button class="btn" onclick="makeRequest('login')">Login</button>
+                </div>
+
+                <!-- Get User Form -->
+                <div class="endpoint-form" id="user">
+                    <h2>👤 Get Current User</h2>
+                    <p>Retrieve information about the currently authenticated user.</p>
+                    <button class="btn" onclick="makeRequest('user')">Get User Info</button>
+                </div>
+
+                <!-- Logout Form -->
+                <div class="endpoint-form" id="logout">
+                    <h2>🚪 Logout</h2>
+                    <p>Logout the current user and invalidate the token.</p>
+                    <button class="btn" onclick="makeRequest('logout')">Logout</button>
+                </div>
+
+                <!-- Karyawan List -->
+                <div class="endpoint-form" id="karyawan-list">
+                    <h2>👥 List Karyawan</h2>
+                    <p>Get all employees with their department and position information.</p>
+                    <button class="btn" onclick="makeRequest('karyawan-list')">Get Karyawan</button>
+                </div>
+
+                <!-- Create Karyawan -->
+                <div class="endpoint-form" id="karyawan-create">
+                    <h2>➕ Create Karyawan</h2>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>NIK:</label>
+                            <input type="text" id="create-nik" value="EMP001">
+                        </div>
+                        <div class="form-group">
+                            <label>Nama Lengkap:</label>
+                            <input type="text" id="create-nama" value="John Doe">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Email:</label>
+                            <input type="email" id="create-email" value="john.doe@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Nomor Telepon:</label>
+                            <input type="text" id="create-phone" value="081234567890">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Tanggal Masuk:</label>
+                            <input type="date" id="create-tanggal-masuk" value="2024-01-01">
+                        </div>
+                        <div class="form-group">
+                            <label>Jenis Kelamin:</label>
+                            <select id="create-jenis-kelamin">
+                                <option value="Laki-laki">Laki-laki</option>
+                                <option value="Perempuan">Perempuan</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Status Perkawinan:</label>
+                            <select id="create-status-nikah">
+                                <option value="Belum Menikah">Belum Menikah</option>
+                                <option value="Menikah">Menikah</option>
+                                <option value="Cerai">Cerai</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Kategori Gaji:</label>
+                            <select id="create-kategori-gaji">
+                                <option value="Bulanan">Bulanan</option>
+                                <option value="Harian">Harian</option>
+                                <option value="Borongan">Borongan</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Departemen ID:</label>
+                            <input type="number" id="create-departemen-id" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Jabatan ID:</label>
+                            <input type="number" id="create-jabatan-id" value="1">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Alamat:</label>
+                        <textarea id="create-alamat" placeholder="Alamat lengkap">Jl. Contoh No. 123, Jakarta</textarea>
+                    </div>
+                    <button class="btn" onclick="makeRequest('karyawan-create')">Create Karyawan</button>
+                </div>
+
+                <!-- Show Karyawan -->
+                <div class="endpoint-form" id="karyawan-show">
+                    <h2>👁️ Show Karyawan</h2>
+                    <div class="form-group">
+                        <label>Karyawan ID:</label>
+                        <input type="number" id="show-karyawan-id" value="1">
+                    </div>
+                    <button class="btn" onclick="makeRequest('karyawan-show')">Get Karyawan</button>
+                </div>
+
+                <!-- Update Karyawan -->
+                <div class="endpoint-form" id="karyawan-update">
+                    <h2>✏️ Update Karyawan</h2>
+                    <div class="form-group">
+                        <label>Karyawan ID:</label>
+                        <input type="number" id="update-karyawan-id" value="1">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>NIK:</label>
+                            <input type="text" id="update-nik" value="EMP001">
+                        </div>
+                        <div class="form-group">
+                            <label>Nama Lengkap:</label>
+                            <input type="text" id="update-nama" value="John Doe Updated">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Email:</label>
+                        <input type="email" id="update-email" value="john.updated@example.com">
+                    </div>
+                    <button class="btn" onclick="makeRequest('karyawan-update')">Update Karyawan</button>
+                </div>
+
+                <!-- Delete Karyawan -->
+                <div class="endpoint-form" id="karyawan-delete">
+                    <h2>🗑️ Delete Karyawan</h2>
+                    <div class="form-group">
+                        <label>Karyawan ID:</label>
+                        <input type="number" id="delete-karyawan-id" value="1">
+                    </div>
+                    <p style="color: #dc3545; margin: 15px 0;">⚠️ This will set karyawan status to 'Resign'</p>
+                    <button class="btn" onclick="makeRequest('karyawan-delete')">Delete Karyawan</button>
+                </div>
+
+                <!-- Departemen List -->
+                <div class="endpoint-form" id="departemen-list">
+                    <h2>🏢 List Departemen</h2>
+                    <p>Get all departments with employee count.</p>
+                    <button class="btn" onclick="makeRequest('departemen-list')">Get Departemen</button>
+                </div>
+
+                <!-- Create Departemen -->
+                <div class="endpoint-form" id="departemen-create">
+                    <h2>➕ Create Departemen</h2>
+                    <div class="form-group">
+                        <label>Nama Departemen:</label>
+                        <input type="text" id="create-dept-nama" value="IT Department">
+                    </div>
+                    <div class="form-group">
+                        <label>Menggunakan Shift:</label>
+                        <select id="create-dept-shift">
+                            <option value="true">Ya</option>
+                            <option value="false">Tidak</option>
+                        </select>
+                    </div>
+                    <button class="btn" onclick="makeRequest('departemen-create')">Create Departemen</button>
+                </div>
+
+                <!-- Jabatan List -->
+                <div class="endpoint-form" id="jabatan-list">
+                    <h2>💼 List Jabatan</h2>
+                    <p>Get all positions with employee count.</p>
+                    <button class="btn" onclick="makeRequest('jabatan-list')">Get Jabatan</button>
+                </div>
+
+                <!-- Create Jabatan -->
+                <div class="endpoint-form" id="jabatan-create">
+                    <h2>➕ Create Jabatan</h2>
+                    <div class="form-group">
+                        <label>Nama Jabatan:</label>
+                        <input type="text" id="create-jabatan-nama" value="Software Developer">
+                    </div>
+                    <button class="btn" onclick="makeRequest('jabatan-create')">Create Jabatan</button>
+                </div>
+
+                <!-- Shift List -->
+                <div class="endpoint-form" id="shift-list">
+                    <h2>⏰ List Shift</h2>
+                    <p>Get all work shifts.</p>
+                    <button class="btn" onclick="makeRequest('shift-list')">Get Shift</button>
+                </div>
+
+                <!-- Create Shift -->
+                <div class="endpoint-form" id="shift-create">
+                    <h2>➕ Create Shift</h2>
+                    <div class="form-group">
+                        <label>Kode Shift:</label>
+                        <input type="text" id="create-shift-kode" value="SHIFT1">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Jam Masuk:</label>
+                            <input type="time" id="create-shift-masuk" value="08:00">
+                        </div>
+                        <div class="form-group">
+                            <label>Jam Pulang:</label>
+                            <input type="time" id="create-shift-pulang" value="17:00">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Hari Berikutnya:</label>
+                        <select id="create-shift-berikutnya">
+                            <option value="false">Tidak</option>
+                            <option value="true">Ya</option>
+                        </select>
+                    </div>
+                    <button class="btn" onclick="makeRequest('shift-create')">Create Shift</button>
+                </div>
+
+                <!-- Get Jadwal Shift -->
+                <div class="endpoint-form" id="jadwal-get">
+                    <h2>📅 Get Jadwal by Departemen</h2>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Departemen ID:</label>
+                            <input type="number" id="jadwal-departemen-id" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Tahun:</label>
+                            <input type="number" id="jadwal-tahun" value="2024">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Bulan:</label>
+                        <input type="number" id="jadwal-bulan" value="12" min="1" max="12">
+                    </div>
+                    <button class="btn" onclick="makeRequest('jadwal-get')">Get Jadwal</button>
+                </div>
+
+                <!-- Update Jadwal Shift -->
+                <div class="endpoint-form" id="jadwal-update">
+                    <h2>📝 Update Jadwal Shift</h2>
+                    <div class="form-group">
+                        <label>Jadwal Data (JSON Array):</label>
+                        <textarea id="jadwal-data" placeholder='[{"karyawan_id": 1, "tanggal_jadwal": "2024-12-15", "shift_id": 1}]'>[
+  {
+    "karyawan_id": 1,
+    "tanggal_jadwal": "2024-12-15",
+    "shift_id": 1
+  }
+]</textarea>
+                    </div>
+                    <button class="btn" onclick="makeRequest('jadwal-update')">Update Jadwal</button>
+                </div>
+
+                <!-- Fingerprint Logs -->
+                <div class="endpoint-form" id="fingerprint-logs">
+                    <h2>📋 Attendance Logs</h2>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Start Date (optional):</label>
+                            <input type="date" id="logs-start-date">
+                        </div>
+                        <div class="form-group">
+                            <label>End Date (optional):</label>
+                            <input type="date" id="logs-end-date">
+                        </div>
+                    </div>
+                    <button class="btn" onclick="makeRequest('fingerprint-logs')">Get Logs</button>
+                </div>
+
+                <!-- Fingerprint Summary -->
+                <div class="endpoint-form" id="fingerprint-summary">
+                    <h2>📊 Attendance Summary</h2>
+                    <div class="form-group">
+                        <label>Month (YYYY-MM):</label>
+                        <input type="month" id="summary-month" value="2024-12">
+                    </div>
+                    <button class="btn" onclick="makeRequest('fingerprint-summary')">Get Summary</button>
+                </div>
+
+                <!-- Import Fingerprint -->
+                <div class="endpoint-form" id="fingerprint-import">
+                    <h2>📥 Import Attendance Logs</h2>
+                    <div class="form-group">
+                        <label>Logs Data (JSON Array):</label>
+                        <textarea id="import-logs-data" placeholder='[{"pin": "1001", "waktu": "2024-12-15 08:00:00", "status": "in"}]'>[
+  {
+    "pin": "1001",
+    "waktu": "2024-12-15 08:00:00",
+    "status": "in"
+  },
+  {
+    "pin": "1001", 
+    "waktu": "2024-12-15 17:00:00",
+    "status": "out"
+  }
+]</textarea>
+                    </div>
+                    <button class="btn" onclick="makeRequest('fingerprint-import')">Import Logs</button>
+                </div>
+
+                <!-- Process Fingerprint Logs -->
+                <div class="endpoint-form" id="fingerprint-process">
+                    <h2>⚙️ Process Unprocessed Logs</h2>
+                    <p>Process all unprocessed attendance logs to create attendance records.</p>
+                    <button class="btn" onclick="makeRequest('fingerprint-process')">Process Logs</button>
+                </div>
+
+                <!-- Set PIN Fingerprint -->
+                <div class="endpoint-form" id="fingerprint-set-pin">
+                    <h2>🔢 Set PIN Fingerprint</h2>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Karyawan ID:</label>
+                            <input type="number" id="pin-karyawan-id" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label>PIN:</label>
+                            <input type="text" id="pin-value" value="1001">
+                        </div>
+                    </div>
+                    <button class="btn" onclick="makeRequest('fingerprint-set-pin')">Set PIN</button>
+                </div>
+
+                <!-- Fingerspot Device Status -->
+                <div class="endpoint-form" id="fingerspot-status">
+                    <h2>🤖 Device Status</h2>
+                    <p>Check if fingerprint device is online and accessible.</p>
+                    <button class="btn" onclick="makeRequest('fingerspot-status')">Check Status</button>
+                </div>
+
+                <!-- Fingerspot User Info -->
+                <div class="endpoint-form" id="fingerspot-userinfo">
+                    <h2>👤 Get User Info from Device</h2>
+                    <div class="form-group">
+                        <label>PIN (optional):</label>
+                        <input type="text" id="device-pin" placeholder="Leave empty for all users">
+                    </div>
+                    <button class="btn" onclick="makeRequest('fingerspot-userinfo')">Get User Info</button>
+                </div>
+
+                <!-- Register User to Device -->
+                <div class="endpoint-form" id="fingerspot-register">
+                    <h2>➕ Register User to Device</h2>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Karyawan ID:</label>
+                            <input type="number" id="register-karyawan-id" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label>PIN:</label>
+                            <input type="text" id="register-pin" value="1001">
+                        </div>
+                    </div>
+                    <button class="btn" onclick="makeRequest('fingerspot-register')">Register User</button>
+                </div>
+
+                <!-- Remove User from Device -->
+                <div class="endpoint-form" id="fingerspot-remove">
+                    <h2>🗑️ Remove User from Device</h2>
+                    <div class="form-group">
+                        <label>Karyawan ID:</label>
+                        <input type="number" id="remove-karyawan-id" value="1">
+                    </div>
+                    <button class="btn" onclick="makeRequest('fingerspot-remove')">Remove User</button>
+                </div>
+
+                <!-- Sync All Users -->
+                <div class="endpoint-form" id="fingerspot-sync">
+                    <h2>🔄 Sync All Users to Device</h2>
+                    <p>Sync all karyawan with PIN fingerprint to the device.</p>
+                    <button class="btn" onclick="makeRequest('fingerspot-sync')">Sync All Users</button>
+                </div>
+
+                <!-- Import Attendance from Device -->
+                <div class="endpoint-form" id="fingerspot-import-attendance">
+                    <h2>📥 Import Attendance from Device</h2>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Start Date:</label>
+                            <input type="date" id="import-start-date" value="2024-12-01">
+                        </div>
+                        <div class="form-group">
+                            <label>End Date:</label>
+                            <input type="date" id="import-end-date" value="2024-12-31">
+                        </div>
+                    </div>
+                    <button class="btn" onclick="makeRequest('fingerspot-import-attendance')">Import Attendance</button>
+                </div>
+
+                <!-- Generate Payroll -->
+                <div class="endpoint-form" id="payroll-generate">
+                    <h2>💰 Generate Payroll</h2>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Karyawan ID:</label>
+                            <input type="number" id="payroll-karyawan-id" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Periode (YYYY-MM):</label>
+                            <input type="month" id="payroll-periode" value="2024-12">
+                        </div>
+                    </div>
+                    <button class="btn" onclick="makeRequest('payroll-generate')">Generate Payroll</button>
+                </div>
+
+                <!-- Payroll History -->
+                <div class="endpoint-form" id="payroll-history">
+                    <h2>📜 Payroll History</h2>
+                    <div class="form-group">
+                        <label>Karyawan ID:</label>
+                        <input type="number" id="history-karyawan-id" value="1">
+                    </div>
+                    <button class="btn" onclick="makeRequest('payroll-history')">Get History</button>
+                </div>
+
+                <!-- Slip Gaji -->
+                <div class="endpoint-form" id="payroll-slip">
+                    <h2>📄 Slip Gaji</h2>
+                    <div class="form-group">
+                        <label>Gaji ID:</label>
+                        <input type="number" id="slip-gaji-id" value="1">
+                    </div>
+                    <button class="btn" onclick="makeRequest('payroll-slip')">Get Slip Gaji</button>
+                </div>
+
+                <!-- Setting Gaji List -->
+                <div class="endpoint-form" id="setting-gaji-list">
+                    <h2>⚙️ List Setting Gaji</h2>
+                    <p>Get all salary settings.</p>
+                    <button class="btn" onclick="makeRequest('setting-gaji-list')">Get Settings</button>
+                </div>
+
+                <!-- Create Setting Gaji -->
+                <div class="endpoint-form" id="setting-gaji-create">
+                    <h2>➕ Create Setting Gaji</h2>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Premi Produksi:</label>
+                            <input type="number" id="setting-premi-produksi" value="50000">
+                        </div>
+                        <div class="form-group">
+                            <label>Premi Staff:</label>
+                            <input type="number" id="setting-premi-staff" value="75000">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Uang Makan Produksi Weekday:</label>
+                            <input type="number" id="setting-makan-prod-weekday" value="15000">
+                        </div>
+                        <div class="form-group">
+                            <label>Uang Makan Staff Weekday:</label>
+                            <input type="number" id="setting-makan-staff-weekday" value="20000">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Tarif Lembur Produksi/jam:</label>
+                            <input type="number" id="setting-lembur-produksi" value="25000">
+                        </div>
+                        <div class="form-group">
+                            <label>Tarif Lembur Staff/jam:</label>
+                            <input type="number" id="setting-lembur-staff" value="35000">
+                        </div>
+                    </div>
+                    <button class="btn" onclick="makeRequest('setting-gaji-create')">Create Setting</button>
+                </div>
+
+                <!-- Active Setting Gaji -->
+                <div class="endpoint-form" id="setting-gaji-active">
+                    <h2>✅ Active Setting Gaji</h2>
+                    <p>Get currently active salary setting.</p>
+                    <button class="btn" onclick="makeRequest('setting-gaji-active')">Get Active Setting</button>
+                </div>
+
+                <!-- Calculate Gaji Tambahan -->
+                <div class="endpoint-form" id="gaji-tambahan-calculate">
+                    <h2>🧮 Calculate Gaji Tambahan</h2>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Role Karyawan:</label>
+                            <select id="calc-role">
+                                <option value="produksi">Produksi</option>
+                                <option value="staff">Staff</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Jenis Hari:</label>
+                            <select id="calc-jenis-hari">
+                                <option value="weekday">Weekday</option>
+                                <option value="weekend">Weekend</option>
+                                <option value="tanggal_merah">Tanggal Merah</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Jam Lembur:</label>
+                            <input type="number" id="calc-jam-lembur" value="2" step="0.5">
+                        </div>
+                        <div class="form-group">
+                            <label>Jam Selesai Kerja:</label>
+                            <input type="time" id="calc-jam-selesai" value="19:00">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Hadir 6 Hari:</label>
+                        <select id="calc-hadir-6-hari">
+                            <option value="true">Ya</option>
+                            <option value="false">Tidak</option>
+                        </select>
+                    </div>
+                    <button class="btn" onclick="makeRequest('gaji-tambahan-calculate')">Calculate</button>
+                </div>
+
+                <!-- Get Gaji Tambahan Periode -->
+                <div class="endpoint-form" id="gaji-tambahan-periode">
+                    <h2>📊 Get Gaji Tambahan Periode</h2>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Karyawan ID:</label>
+                            <input type="number" id="periode-karyawan-id" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Periode (YYYY-MM):</label>
+                            <input type="month" id="periode-value" value="2024-12">
+                        </div>
+                    </div>
+                    <button class="btn" onclick="makeRequest('gaji-tambahan-periode')">Get Periode</button>
+                </div>
+
+                <!-- Recalculate All -->
+                <div class="endpoint-form" id="gaji-tambahan-recalculate">
+                    <h2>🔄 Recalculate All Gaji Tambahan</h2>
+                    <div class="form-group">
+                        <label>Periode (YYYY-MM):</label>
+                        <input type="month" id="recalc-periode" value="2024-12">
+                    </div>
+                    <p style="color: #dc3545; margin: 15px 0;">⚠️ This will recalculate all attendance records for the period</p>
+                    <button class="btn" onclick="makeRequest('gaji-tambahan-recalculate')">Recalculate All</button>
+                </div>
+
+                <!-- Summary by Departemen -->
+                <div class="endpoint-form" id="gaji-tambahan-summary">
+                    <h2>📈 Summary by Departemen</h2>
+                    <div class="form-group">
+                        <label>Periode (YYYY-MM):</label>
+                        <input type="month" id="summary-periode" value="2024-12">
+                    </div>
+                    <button class="btn" onclick="makeRequest('gaji-tambahan-summary')">Get Summary</button>
+                </div>
+
+                <!-- Loading -->
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Making request...</p>
+                </div>
+
+                <!-- Response Section -->
+                <div class="response-section" id="responseSection" style="display: none;">
+                    <h3>Response <span id="statusIndicator"></span></h3>
+                    <div class="response-tabs">
+                        <button class="tab-btn active" onclick="showTab('response')">Response</button>
+                        <button class="tab-btn" onclick="showTab('headers')">Headers</button>
+                        <button class="tab-btn" onclick="showTab('request')">Request</button>
+                    </div>
+                    <div class="response-content" id="responseContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'response';
+        let lastResponse = {};
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set active endpoint
+            const firstBtn = document.querySelector('.endpoint-btn');
+            if (firstBtn) {
+                firstBtn.click();
+            }
+        });
+
+        // Endpoint button handlers
+        document.querySelectorAll('.endpoint-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                // Remove active class from all buttons
+                document.querySelectorAll('.endpoint-btn').forEach(b => b.classList.remove('active'));
+                // Add active class to clicked button
+                this.classList.add('active');
+                
+                // Hide all forms
+                document.querySelectorAll('.endpoint-form').forEach(form => form.classList.remove('active'));
+                // Show selected form
+                const endpoint = this.dataset.endpoint;
+                document.getElementById(endpoint).classList.add('active');
+                
+                // Hide response section
+                document.getElementById('responseSection').style.display = 'none';
+            });
+        });
+
+        function getAuthHeaders() {
+            const token = document.getElementById('authToken').value;
+            return {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            };
+        }
+
+        function getBaseUrl() {
+            return document.getElementById('baseUrl').value;
+        }
+
+        async function makeRequest(endpoint) {
+            const loading = document.getElementById('loading');
+            const responseSection = document.getElementById('responseSection');
+            
+            // Show loading
+            loading.style.display = 'block';
+            responseSection.style.display = 'none';
+            
+            let url, method = 'GET', body = null, headers = {};
+
+            try {
+                switch(endpoint) {
+                    case 'login':
+                        url = `${getBaseUrl()}/login`;
+                        method = 'POST';
+                        body = {
+                            nik: document.getElementById('login-nik').value,
+                            password: document.getElementById('login-password').value
+                        };
+                        headers = {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        };
+                        break;
+
+                    case 'user':
+                        url = `${getBaseUrl()}/user`;
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'logout':
+                        url = `${getBaseUrl()}/logout`;
+                        method = 'POST';
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'karyawan-list':
+                        url = `${getBaseUrl()}/karyawan`;
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'karyawan-create':
+                        url = `${getBaseUrl()}/karyawan`;
+                        method = 'POST';
+                        body = {
+                            nik: document.getElementById('create-nik').value,
+                            nama_lengkap: document.getElementById('create-nama').value,
+                            email: document.getElementById('create-email').value,
+                            nomor_telepon: document.getElementById('create-phone').value,
+                            tanggal_masuk: document.getElementById('create-tanggal-masuk').value,
+                            jenis_kelamin: document.getElementById('create-jenis-kelamin').value,
+                            status_perkawinan: document.getElementById('create-status-nikah').value,
+                            kategori_gaji: document.getElementById('create-kategori-gaji').value,
+                            departemen_id_saat_ini: parseInt(document.getElementById('create-departemen-id').value),
+                            jabatan_id_saat_ini: parseInt(document.getElementById('create-jabatan-id').value),
+                            alamat: document.getElementById('create-alamat').value,
+                            status: 'Aktif'
+                        };
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'karyawan-show':
+                        const karyawanId = document.getElementById('show-karyawan-id').value;
+                        url = `${getBaseUrl()}/karyawan/${karyawanId}`;
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'karyawan-update':
+                        const updateId = document.getElementById('update-karyawan-id').value;
+                        url = `${getBaseUrl()}/karyawan/${updateId}`;
+                        method = 'PUT';
+                        body = {
+                            nik: document.getElementById('update-nik').value,
+                            nama_lengkap: document.getElementById('update-nama').value,
+                            email: document.getElementById('update-email').value
+                        };
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'karyawan-delete':
+                        const deleteId = document.getElementById('delete-karyawan-id').value;
+                        url = `${getBaseUrl()}/karyawan/${deleteId}`;
+                        method = 'DELETE';
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'departemen-list':
+                        url = `${getBaseUrl()}/departemen`;
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'departemen-create':
+                        url = `${getBaseUrl()}/departemen`;
+                        method = 'POST';
+                        body = {
+                            nama_departemen: document.getElementById('create-dept-nama').value,
+                            menggunakan_shift: document.getElementById('create-dept-shift').value === 'true'
+                        };
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'jabatan-list':
+                        url = `${getBaseUrl()}/jabatan`;
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'jabatan-create':
+                        url = `${getBaseUrl()}/jabatan`;
+                        method = 'POST';
+                        body = {
+                            nama_jabatan: document.getElementById('create-jabatan-nama').value
+                        };
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'shift-list':
+                        url = `${getBaseUrl()}/shift`;
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'shift-create':
+                        url = `${getBaseUrl()}/shift`;
+                        method = 'POST';
+                        const jamMasuk = document.getElementById('create-shift-masuk').value + ':00';
+                        const jamPulang = document.getElementById('create-shift-pulang').value + ':00';
+                        body = {
+                            kode_shift: document.getElementById('create-shift-kode').value,
+                            jam_masuk: jamMasuk,
+                            jam_pulang: jamPulang,
+                            hari_berikutnya: document.getElementById('create-shift-berikutnya').value === 'true'
+                        };
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'jadwal-get':
+                        const deptId = document.getElementById('jadwal-departemen-id').value;
+                        const tahun = document.getElementById('jadwal-tahun').value;
+                        const bulan = document.getElementById('jadwal-bulan').value;
+                        url = `${getBaseUrl()}/jadwal-shift/${deptId}/${tahun}/${bulan}`;
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'jadwal-update':
+                        url = `${getBaseUrl()}/jadwal-shift`;
+                        method = 'POST';
+                        body = {
+                            jadwal: JSON.parse(document.getElementById('jadwal-data').value)
+                        };
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'fingerprint-logs':
+                        url = `${getBaseUrl()}/fingerprint/logs`;
+                        const startDate = document.getElementById('logs-start-date').value;
+                        const endDate = document.getElementById('logs-end-date').value;
+                        const logParams = new URLSearchParams();
+                        if (startDate) logParams.append('start_date', startDate);
+                        if (endDate) logParams.append('end_date', endDate);
+                        if (logParams.toString()) url += '?' + logParams.toString();
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'fingerprint-summary':
+                        url = `${getBaseUrl()}/fingerprint/summary`;
+                        const month = document.getElementById('summary-month').value;
+                        if (month) url += `?month=${month}`;
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'fingerprint-import':
+                        url = `${getBaseUrl()}/fingerprint/import-logs`;
+                        method = 'POST';
+                        const logsData = document.getElementById('import-logs-data').value;
+                        body = { logs: JSON.parse(logsData || '[]') };
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'fingerprint-process':
+                        url = `${getBaseUrl()}/fingerprint/process-logs`;
+                        method = 'POST';
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'fingerprint-set-pin':
+                        url = `${getBaseUrl()}/fingerprint/set-pin`;
+                        method = 'POST';
+                        body = {
+                            karyawan_id: parseInt(document.getElementById('pin-karyawan-id').value),
+                            pin: document.getElementById('pin-value').value
+                        };
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'fingerspot-status':
+                        url = `${getBaseUrl()}/fingerspot/status`;
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'fingerspot-userinfo':
+                        url = `${getBaseUrl()}/fingerspot/userinfo`;
+                        const pin = document.getElementById('device-pin').value;
+                        if (pin) url += `?pin=${pin}`;
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'fingerspot-register':
+                        url = `${getBaseUrl()}/fingerspot/register-user`;
+                        method = 'POST';
+                        body = {
+                            karyawan_id: parseInt(document.getElementById('register-karyawan-id').value),
+                            pin: document.getElementById('register-pin').value
+                        };
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'fingerspot-remove':
+                        url = `${getBaseUrl()}/fingerspot/remove-user`;
+                        method = 'DELETE';
+                        body = {
+                            karyawan_id: parseInt(document.getElementById('remove-karyawan-id').value)
+                        };
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'fingerspot-sync':
+                        url = `${getBaseUrl()}/fingerspot/sync-all-users`;
+                        method = 'POST';
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'fingerspot-import-attendance':
+                        url = `${getBaseUrl()}/fingerspot/import-attendance`;
+                        method = 'POST';
+                        body = {
+                            start_date: document.getElementById('import-start-date').value,
+                            end_date: document.getElementById('import-end-date').value
+                        };
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'payroll-generate':
+                        url = `${getBaseUrl()}/payroll/generate`;
+                        method = 'POST';
+                        body = {
+                            karyawan_id: parseInt(document.getElementById('payroll-karyawan-id').value),
+                            periode: document.getElementById('payroll-periode').value
+                        };
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'payroll-history':
+                        const historyKaryawanId = document.getElementById('history-karyawan-id').value;
+                        url = `${getBaseUrl()}/payroll/history/${historyKaryawanId}`;
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'payroll-slip':
+                        const slipGajiId = document.getElementById('slip-gaji-id').value;
+                        url = `${getBaseUrl()}/payroll/slip/${slipGajiId}`;
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'setting-gaji-list':
+                        url = `${getBaseUrl()}/setting-gaji`;
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'setting-gaji-create':
+                        url = `${getBaseUrl()}/setting-gaji`;
+                        method = 'POST';
+                        body = {
+                            premi_produksi: parseFloat(document.getElementById('setting-premi-produksi').value),
+                            premi_staff: parseFloat(document.getElementById('setting-premi-staff').value),
+                            uang_makan_produksi_weekday: parseFloat(document.getElementById('setting-makan-prod-weekday').value),
+                            uang_makan_produksi_weekend_5_10: 20000,
+                            uang_makan_produksi_weekend_10_20: 25000,
+                            uang_makan_staff_weekday: parseFloat(document.getElementById('setting-makan-staff-weekday').value),
+                            uang_makan_staff_weekend_5_10: 25000,
+                            uang_makan_staff_weekend_10_20: 30000,
+                            tarif_lembur_produksi_per_jam: parseFloat(document.getElementById('setting-lembur-produksi').value),
+                            tarif_lembur_staff_per_jam: parseFloat(document.getElementById('setting-lembur-staff').value)
+                        };
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'setting-gaji-active':
+                        url = `${getBaseUrl()}/setting-gaji/active`;
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'gaji-tambahan-calculate':
+                        url = `${getBaseUrl()}/gaji-tambahan/calculate`;
+                        method = 'POST';
+                        body = {
+                            role_karyawan: document.getElementById('calc-role').value,
+                            jenis_hari: document.getElementById('calc-jenis-hari').value,
+                            jam_lembur: parseFloat(document.getElementById('calc-jam-lembur').value),
+                            jam_selesai_kerja: document.getElementById('calc-jam-selesai').value,
+                            hadir_6_hari: document.getElementById('calc-hadir-6-hari').value === 'true'
+                        };
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'gaji-tambahan-periode':
+                        const periodeKaryawanId = document.getElementById('periode-karyawan-id').value;
+                        const periode = document.getElementById('periode-value').value;
+                        url = `${getBaseUrl()}/gaji-tambahan/periode/${periodeKaryawanId}/${periode}`;
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'gaji-tambahan-recalculate':
+                        url = `${getBaseUrl()}/gaji-tambahan/recalculate-all`;
+                        method = 'POST';
+                        body = {
+                            periode: document.getElementById('recalc-periode').value
+                        };
+                        headers = getAuthHeaders();
+                        break;
+
+                    case 'gaji-tambahan-summary':
+                        url = `${getBaseUrl()}/gaji-tambahan/summary/${document.getElementById('summary-periode').value}`;
+                        headers = getAuthHeaders();
+                        break;
+
+                    default:
+                        throw new Error('Unknown endpoint');
+                }
+
+                const requestData = {
+                    method,
+                    headers,
+                    ...(body && { body: JSON.stringify(body) })
+                };
+
+                const response = await fetch(url, requestData);
+                const responseData = await response.json();
+
+                lastResponse = {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Object.fromEntries([...response.headers.entries()]),
+                    data: responseData,
+                    request: {
+                        url,
+                        method,
+                        headers,
+                        body
+                    }
+                };
+
+                displayResponse();
+
+            } catch (error) {
+                lastResponse = {
+                    status: 0,
+                    statusText: 'Error',
+                    headers: {},
+                    data: { error: error.message },
+                    request: { url, method, headers, body }
+                };
+                displayResponse();
+            } finally {
+                loading.style.display = 'none';
+                responseSection.style.display = 'block';
+            }
+        }
+
+        function displayResponse() {
+            const statusIndicator = document.getElementById('statusIndicator');
+            const responseContent = document.getElementById('responseContent');
+
+            // Update status indicator
+            const status = lastResponse.status;
+            let statusClass = 'status-error';
+            if (status >= 200 && status < 300) statusClass = 'status-success';
+            else if (status >= 300 && status < 400) statusClass = 'status-warning';
+
+            statusIndicator.innerHTML = `<span class="${statusClass}">${status} ${lastResponse.statusText}</span>`;
+
+            // Show current tab content
+            showTab(currentTab);
+        }
+
+        function showTab(tab) {
+            currentTab = tab;
+            const responseContent = document.getElementById('responseContent');
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event?.target?.classList.add('active') || document.querySelector(`[onclick="showTab('${tab}')"]`)?.classList.add('active');
+
+            let content = '';
+            switch(tab) {
+                case 'response':
+                    content = JSON.stringify(lastResponse.data, null, 2);
+                    break;
+                case 'headers':
+                    content = JSON.stringify(lastResponse.headers, null, 2);
+                    break;
+                case 'request':
+                    content = JSON.stringify(lastResponse.request, null, 2);
+                    break;
+            }
+
+            responseContent.textContent = content;
+        }
+    </script>
+</body>
+</html>

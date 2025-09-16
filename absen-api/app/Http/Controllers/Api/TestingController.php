@@ -100,13 +100,19 @@ class TestingController extends Controller
                 'process_result' => $processResult
             ]);
 
-        } catch (\Exception $e) {
-            DB::rollback();
-            return response()->json([
-                'message' => 'Failed to create sample attendance',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+       } catch (\Throwable $e) {
+        \Log::error('TestingController Error', [
+            'msg' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+
+        return response()->json([
+            'message' => 'Failed to create sample attendance',
+            'error'   => $e->getMessage(),
+            'file'    => $e->getFile(),
+            'line'    => $e->getLine(),
+        ], 500);
+    }
     }
 
     /**

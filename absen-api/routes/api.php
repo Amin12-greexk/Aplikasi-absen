@@ -1,6 +1,4 @@
 <?php
-// routes/api.php (FIXED VERSION)
-
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
@@ -15,6 +13,7 @@ use App\Http\Controllers\Api\FingerprintController;
 use App\Http\Controllers\Api\SettingGajiController;
 use App\Http\Controllers\Api\GajiTambahanController;
 use App\Http\Controllers\Api\FingerspotIntegrationController;
+use App\Http\Controllers\Api\TestingController;
 
 // Endpoint publik
 Route::post('/login', [AuthController::class, 'login']);
@@ -47,6 +46,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('departemen', DepartemenController::class)->middleware('can:manage-master-data');
     Route::apiResource('jabatan', JabatanController::class)->middleware('can:manage-master-data');
     Route::apiResource('shift', ShiftController::class)->middleware('can:manage-master-data');
+    
 
     // Jadwal Shift
     Route::get('jadwal-shift/{departemen_id}/{tahun}/{bulan}', [JadwalShiftController::class, 'getJadwalByDepartemen']);
@@ -114,9 +114,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // ========================================
     
     Route::prefix('testing')->group(function () {
-        Route::post('create-sample-attendance', 'TestingController@createSampleAttendance');
-        Route::post('generate-month-data/{karyawan_id}/{periode}', 'TestingController@generateMonthData');
-        Route::get('attendance-summary/{periode}', 'TestingController@getAttendanceSummary');
-        Route::delete('clear-test-data', 'TestingController@clearTestData');
-    });
+    Route::post('create-sample-attendance', [TestingController::class, 'createSampleAttendance']);   // ✅ ada
+    Route::post('generate-month-data/{karyawan_id}/{periode}', [TestingController::class, 'generateMonthData']); // ✅ ada
+    Route::post('generate-sample-data-for-all', [TestingController::class, 'generateSampleDataForAll']); // ✅ ada
+    Route::post('test-calculation', [TestingController::class, 'testCalculation']); // ✅ ada
+    Route::get('attendance-summary/{periode}', [TestingController::class, 'getAttendanceSummary']); // ✅ ada
+    Route::delete('clear-test-data', [TestingController::class, 'clearTestData']); // ✅ ada
+});
 });

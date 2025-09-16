@@ -13,6 +13,7 @@ class AttendanceLog extends Model
 
     protected $table = 'attendance_log';
     protected $primaryKey = 'log_id';
+    public $timestamps = true;
 
     protected $fillable = [
         'device_sn', 'pin', 'scan_time', 'verify_mode', 

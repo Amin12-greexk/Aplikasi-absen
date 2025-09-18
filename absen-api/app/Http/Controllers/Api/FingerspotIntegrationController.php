@@ -149,7 +149,45 @@ class FingerspotIntegrationController extends Controller
             ], 500);
         }
     }
-
+    /**
+ * Sync user data from device to database
+ */
+public function syncUsersData(): JsonResponse
+{
+    try {
+        $deviceUsers = $this->fingerspotService->getUserInfo();
+        $synced = 0;
+        $errors = [];
+        
+        foreach ($deviceUsers as $deviceUser) {
+            try {
+                $karyawan = Karyawan::where('pin_fingerprint', $deviceUser['PIN'])->first();
+                
+                if ($karyawan) {
+                    // Update nama jika berbeda
+                    if ($karyawan->nama_lengkap !== $deviceUser['Name']) {
+                        $karyawan->update(['nama_lengkap' => $deviceUser['Name']]);
+                        $synced++;
+                    }
+                }
+            } catch (\Exception $e) {
+                $errors[] = "Error syncing PIN {$deviceUser['PIN']}: " . $e->getMessage();
+            }
+        }
+        
+        return response()->json([
+            'message' => 'User data sync completed',
+            'synced_count' => $synced,
+            'total_device_users' => count($deviceUsers),
+            'errors' => $errors
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Sync failed',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
     /**
      * Import attendance from device for date range
      */

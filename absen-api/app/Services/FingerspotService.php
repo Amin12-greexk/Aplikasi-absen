@@ -1,299 +1,392 @@
 <?php
-// app/Services/FingerspotService.php (UPDATED)
+// app/Services/FingerprintImportService.php (UPDATED for att_log structure)
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use App\Models\AttendanceLog;
 use App\Models\Karyawan;
+use App\Models\Absensi;
+use App\Models\KehadiranPeriode;
+use App\Models\HariLibur;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
-class FingerspotService
+class FingerprintImportService
 {
-    protected $apiUrl;
-    protected $apiKey;
-    protected $deviceIp;
-    protected $devicePort;
+    protected $gajiTambahanService;
 
     public function __construct()
     {
-        // Ambil dari config yang bisa diset di .env
-        $this->apiUrl = config('services.fingerspot.url', 'http://192.168.11.24');
-        $this->apiKey = config('services.fingerspot.key');
-        $this->deviceIp = config('services.fingerspot.device_ip', '192.168.11.24');
-        $this->devicePort = config('services.fingerspot.device_port', 80);
+        $this->gajiTambahanService = new GajiTambahanService();
     }
 
     /**
-     * Mengambil data log absensi dari API Fingerspot/Revo SDK
+     * Process unprocessed attendance logs into absensi records
      */
-    public function getAttlog(string $startDate, string $endDate)
+    public function processUnprocessedLogs()
     {
-        try {
-            // CONTOH implementasi untuk SDK sebenarnya
-            // Sesuaikan dengan dokumentasi SDK Revo 185BNC
-            
-            $response = Http::timeout(30)->get("{$this->apiUrl}/api/attlog", [
-                'start_date' => $startDate,
-                'end_date' => $endDate,
-                'device_ip' => $this->deviceIp
-            ]);
-
-            if ($response->successful()) {
-                return $response->json();
-            }
-
-            throw new \Exception("Failed to fetch attlog: " . $response->body());
-
-        } catch (\Exception $e) {
-            Log::error("Fingerspot API Error", ['error' => $e->getMessage()]);
-            
-            // Return dummy data untuk development
-            return $this->getDummyAttlogData($startDate, $endDate);
-        }
-    }
-
-    /**
-     * Mengambil info user dari mesin fingerprint
-     */
-    public function getUserInfo($pin = null)
-    {
-        try {
-            $url = "{$this->apiUrl}/api/userinfo";
-            if ($pin) {
-                $url .= "?pin={$pin}";
-            }
-
-            $response = Http::timeout(30)->get($url);
-
-            if ($response->successful()) {
-                return $response->json();
-            }
-
-            throw new \Exception("Failed to fetch userinfo: " . $response->body());
-
-        } catch (\Exception $e) {
-            Log::error("Fingerspot getUserInfo Error", ['error' => $e->getMessage()]);
-            return [];
-        }
-    }
-
-    /**
-     * Set/Register user ke mesin fingerprint
-     */
-    public function setUserInfo($userData)
-    {
-        try {
-            $response = Http::timeout(30)->post("{$this->apiUrl}/api/userinfo", [
-                'pin' => $userData['pin'],
-                'name' => $userData['name'],
-                'privilege' => $userData['privilege'] ?? 0,
-                'password' => $userData['password'] ?? '',
-                'card' => $userData['card'] ?? '',
-                'group' => $userData['group'] ?? 1,
-                'timezone' => $userData['timezone'] ?? 1
-            ]);
-
-            if ($response->successful()) {
-                return $response->json();
-            }
-
-            throw new \Exception("Failed to set userinfo: " . $response->body());
-
-        } catch (\Exception $e) {
-            Log::error("Fingerspot setUserInfo Error", [
-                'error' => $e->getMessage(),
-                'user_data' => $userData
-            ]);
-            return ['success' => false, 'message' => $e->getMessage()];
-        }
-    }
-
-    /**
-     * Hapus user dari mesin fingerprint
-     */
-    public function deleteUserInfo($pin)
-    {
-        try {
-            $response = Http::timeout(30)->delete("{$this->apiUrl}/api/userinfo/{$pin}");
-
-            if ($response->successful()) {
-                return $response->json();
-            }
-
-            throw new \Exception("Failed to delete userinfo: " . $response->body());
-
-        } catch (\Exception $e) {
-            Log::error("Fingerspot deleteUserInfo Error", [
-                'error' => $e->getMessage(),
-                'pin' => $pin
-            ]);
-            return ['success' => false, 'message' => $e->getMessage()];
-        }
-    }
-
-    /**
-     * Sync user dari database ke mesin fingerprint
-     */
-    public function syncUserToDevice(Karyawan $karyawan)
-    {
-        if (!$karyawan->pin_fingerprint) {
-            throw new \Exception("Karyawan {$karyawan->nama_lengkap} belum memiliki PIN fingerprint");
-        }
-
-        $userData = [
-            'pin' => $karyawan->pin_fingerprint,
-            'name' => $karyawan->nama_lengkap,
-            'privilege' => $karyawan->role === 'hr' || $karyawan->role === 'direktur' ? 14 : 0,
-            'group' => 1,
-            'timezone' => 1
-        ];
-
-        return $this->setUserInfo($userData);
-    }
-
-    /**
-     * Sync semua user aktif ke mesin
-     */
-    public function syncAllUsersToDevice()
-    {
-        $karyawanList = Karyawan::where('status', 'Aktif')
-            ->whereNotNull('pin_fingerprint')
-            ->get();
-
-        $results = [];
+        $processedCount = 0;
         $errors = [];
 
-        foreach ($karyawanList as $karyawan) {
-            try {
-                $result = $this->syncUserToDevice($karyawan);
-                $results[] = [
-                    'karyawan_id' => $karyawan->karyawan_id,
-                    'nama' => $karyawan->nama_lengkap,
-                    'pin' => $karyawan->pin_fingerprint,
-                    'result' => $result
-                ];
-            } catch (\Exception $e) {
-                $errors[] = [
-                    'karyawan_id' => $karyawan->karyawan_id,
-                    'nama' => $karyawan->nama_lengkap,
-                    'error' => $e->getMessage()
-                ];
-            }
-        }
+        try {
+            DB::beginTransaction();
 
-        return [
-            'success_count' => count($results),
-            'error_count' => count($errors),
-            'results' => $results,
-            'errors' => $errors
-        ];
-    }
+            // Get all unprocessed logs grouped by PIN and date
+            $unprocessedLogs = AttendanceLog::where('is_processed', false)
+                ->orderBy('scan_date', 'asc') // Changed from scan_time to scan_date
+                ->get()
+                ->groupBy(function ($log) {
+                    return $log->pin . '_' . Carbon::parse($log->scan_date)->format('Y-m-d');
+                });
 
-    /**
-     * Import attendance log dan simpan ke database
-     */
-    public function importAndSaveAttlog($startDate, $endDate)
-    {
-        $attlogData = $this->getAttlog($startDate, $endDate);
-        $imported = 0;
-        $errors = [];
+            foreach ($unprocessedLogs as $key => $logsPerDay) {
+                try {
+                    list($pin, $date) = explode('_', $key);
+                    
+                    // Find karyawan by PIN
+                    $karyawan = Karyawan::where('pin_fingerprint', $pin)->first();
+                    
+                    if (!$karyawan) {
+                        Log::warning("Karyawan with PIN {$pin} not found, skipping logs");
+                        
+                        // Mark logs as processed anyway to avoid reprocessing
+                        foreach ($logsPerDay as $log) {
+                            $log->markAsProcessed();
+                        }
+                        continue;
+                    }
 
-        foreach ($attlogData as $log) {
-            try {
-                // Check if already exists
-                $exists = AttendanceLog::where('device_sn', $log['device_sn'] ?? '')
-                    ->where('pin', $log['pin'])
-                    ->where('scan_time', $log['scan_time'])
-                    ->exists();
+                    // Process logs for this karyawan on this date
+                    $this->processKaryawanDailyLogs($karyawan, $logsPerDay, $date);
+                    $processedCount++;
 
-                if (!$exists) {
-                    AttendanceLog::create([
-                        'device_sn' => $log['device_sn'] ?? 'unknown',
-                        'pin' => $log['pin'],
-                        'scan_time' => Carbon::parse($log['scan_time']),
-                        'verify_mode' => $log['verify_mode'] ?? 1,
-                        'inout_mode' => $log['inout_mode'] ?? 1,
-                        'device_ip' => $log['device_ip'] ?? $this->deviceIp,
-                        'is_processed' => false
+                } catch (\Exception $e) {
+                    $errors[] = "Error processing logs for {$key}: " . $e->getMessage();
+                    Log::error("Error processing attendance log", [
+                        'key' => $key,
+                        'error' => $e->getMessage()
                     ]);
-                    $imported++;
                 }
-            } catch (\Exception $e) {
-                $errors[] = "Error importing log: " . $e->getMessage();
             }
+
+            DB::commit();
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            Log::error("Failed to process attendance logs", ['error' => $e->getMessage()]);
+            $errors[] = "General error: " . $e->getMessage();
         }
 
         return [
-            'imported' => $imported,
+            'processed' => $processedCount,
             'errors' => $errors
         ];
     }
 
     /**
-     * Dummy data untuk development/testing
+     * Process daily logs for a specific karyawan
      */
-    private function getDummyAttlogData($startDate, $endDate)
+    private function processKaryawanDailyLogs(Karyawan $karyawan, $logs, $date)
     {
-        return [
+        // Sort logs by scan_date
+        $sortedLogs = $logs->sortBy('scan_date');
+        
+        // Get first scan (check in) and last scan (check out)
+        $firstScan = $sortedLogs->first();
+        $lastScan = $sortedLogs->count() > 1 ? $sortedLogs->last() : null;
+
+        $jamMasuk = Carbon::parse($firstScan->scan_date);
+        $jamPulang = $lastScan ? Carbon::parse($lastScan->scan_date) : null;
+
+        // Determine status
+        $status = $this->determineStatus($karyawan, $jamMasuk, $date);
+
+        // Get jenis hari
+        $jenisHari = HariLibur::getJenisHari($date);
+
+        // Calculate jam lembur if check out exists
+        $jamLembur = 0;
+        if ($jamPulang) {
+            $jamLembur = $this->calculateJamLembur($jamMasuk, $jamPulang);
+        }
+
+        // Check if karyawan meets premi requirement for the period
+        $periode = Carbon::parse($date)->format('Y-m');
+        $hadirMinimal6Hari = $this->checkHadirMinimal6Hari($karyawan->karyawan_id, $periode);
+
+        // Calculate gaji tambahan if both check in and check out exist
+        $gajiTambahan = [
+            'upah_lembur' => 0,
+            'premi' => 0,
+            'uang_makan' => 0,
+            'total_tambahan' => 0
+        ];
+
+        if ($jamPulang) {
+            $gajiTambahan = $this->gajiTambahanService->hitungGajiTambahan(
+                $karyawan->role_karyawan,
+                $jenisHari,
+                $jamLembur,
+                $jamPulang,
+                $hadirMinimal6Hari
+            );
+        }
+
+        // Create or update absensi record
+        $absensi = Absensi::updateOrCreate(
             [
-                'device_sn' => '616272019373447',
-                'pin' => '16746',
-                'scan_time' => '2025-09-11 07:59:01',
-                'verify_mode' => 1,
-                'inout_mode' => 1,
-                'device_ip' => $this->deviceIp
+                'karyawan_id' => $karyawan->karyawan_id,
+                'tanggal_absensi' => $date
             ],
             [
-                'device_sn' => '616272019373447',
-                'pin' => '16746',
-                'scan_time' => '2025-09-11 17:05:30',
-                'verify_mode' => 1,
-                'inout_mode' => 2,
-                'device_ip' => $this->deviceIp
-            ],
-            [
-                'device_sn' => '616272019373447',
-                'pin' => '193164',
-                'scan_time' => '2025-09-11 08:15:22',
-                'verify_mode' => 1,
-                'inout_mode' => 1,
-                'device_ip' => $this->deviceIp
+                'jam_scan_masuk' => $jamMasuk,
+                'jam_scan_pulang' => $jamPulang,
+                'status' => $status,
+                'jenis_hari' => $jenisHari,
+                'jam_lembur' => $jamLembur,
+                'hadir_6_hari_periode' => $hadirMinimal6Hari,
+                'upah_lembur' => $gajiTambahan['upah_lembur'] ?? $gajiTambahan['lembur_pay'] ?? 0,
+                'premi' => $gajiTambahan['premi'] ?? 0,
+                'uang_makan' => $gajiTambahan['uang_makan'] ?? 0,
+                'total_gaji_tambahan' => $gajiTambahan['total_tambahan'] ?? 0
             ]
+        );
+
+        // Update kehadiran periode
+        $this->updateKehadiranPeriode($karyawan->karyawan_id, $periode);
+
+        // Mark all logs as processed
+        foreach ($logs as $log) {
+            $log->markAsProcessed();
+        }
+
+        Log::info("Processed attendance for karyawan {$karyawan->nama_lengkap} on {$date}", [
+            'absensi_id' => $absensi->absensi_id,
+            'status' => $status,
+            'jam_lembur' => $jamLembur,
+            'total_gaji_tambahan' => $gajiTambahan['total_tambahan'] ?? 0,
+            'sn' => $firstScan->sn // Log device serial number
+        ]);
+    }
+
+    /**
+     * Determine attendance status
+     */
+    private function determineStatus(Karyawan $karyawan, Carbon $jamMasuk, $date)
+    {
+        // Check if it's a holiday
+        $jenisHari = HariLibur::getJenisHari($date);
+        if ($jenisHari === 'tanggal_merah') {
+            return 'Libur';
+        }
+
+        // Get scheduled work time
+        $jamKerjaMasuk = $karyawan->jam_kerja_masuk ?? '08:00:00';
+        $scheduledTime = Carbon::parse($date . ' ' . $jamKerjaMasuk);
+
+        // Add 30 minutes tolerance for late
+        $toleranceTime = $scheduledTime->copy()->addMinutes(30);
+
+        if ($jamMasuk->lte($toleranceTime)) {
+            return 'Hadir';
+        } else {
+            return 'Terlambat';
+        }
+    }
+
+    /**
+     * Calculate overtime hours
+     */
+    private function calculateJamLembur(Carbon $jamMasuk, Carbon $jamPulang)
+    {
+        // Total hours worked
+        $totalJamKerja = $jamMasuk->diffInHours($jamPulang);
+
+        // Normal working hours = 8 hours + 1 hour break = 9 hours
+        $jamKerjaNormal = 9;
+
+        // Overtime = total hours - normal hours
+        $jamLembur = max(0, $totalJamKerja - $jamKerjaNormal);
+
+        return $jamLembur;
+    }
+
+    /**
+     * Check if karyawan has attended at least 6 days in the period
+     */
+    private function checkHadirMinimal6Hari($karyawanId, $periode)
+    {
+        $year = substr($periode, 0, 4);
+        $month = substr($periode, 5, 2);
+
+        $totalHadir = Absensi::where('karyawan_id', $karyawanId)
+            ->whereYear('tanggal_absensi', $year)
+            ->whereMonth('tanggal_absensi', $month)
+            ->whereIn('status', ['Hadir', 'Terlambat'])
+            ->count();
+
+        return $totalHadir >= 6;
+    }
+
+    /**
+     * Update kehadiran periode record
+     */
+    private function updateKehadiranPeriode($karyawanId, $periode)
+    {
+        $year = substr($periode, 0, 4);
+        $month = substr($periode, 5, 2);
+
+        $totalHadir = Absensi::where('karyawan_id', $karyawanId)
+            ->whereYear('tanggal_absensi', $year)
+            ->whereMonth('tanggal_absensi', $month)
+            ->whereIn('status', ['Hadir', 'Terlambat'])
+            ->count();
+
+        $memenuiSyaratPremi = $totalHadir >= 6;
+
+        KehadiranPeriode::updateOrCreate(
+            [
+                'karyawan_id' => $karyawanId,
+                'periode' => $periode
+            ],
+            [
+                'total_hari_hadir' => $totalHadir,
+                'memenuhi_syarat_premi' => $memenuiSyaratPremi
+            ]
+        );
+    }
+
+    /**
+     * Import from SQL file atau direct database
+     */
+    public function importFromDatabase($host, $database, $username, $password, $startDate, $endDate)
+    {
+        try {
+            $pdo = new \PDO("mysql:host={$host};dbname={$database}", $username, $password);
+            $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            $stmt = $pdo->prepare("
+                SELECT sn, scan_date, pin, verifymode, inoutmode, device_ip 
+                FROM att_log 
+                WHERE DATE(scan_date) BETWEEN ? AND ?
+                ORDER BY scan_date ASC
+            ");
+            
+            $stmt->execute([$startDate, $endDate]);
+            $logs = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            $imported = 0;
+            $errors = [];
+
+            foreach ($logs as $log) {
+                try {
+                    // Check if record already exists
+                    $exists = AttendanceLog::findByCompositeKey(
+                        $log['sn'],
+                        $log['scan_date'],
+                        $log['pin']
+                    );
+
+                    if (!$exists) {
+                        AttendanceLog::create([
+                            'sn' => $log['sn'],
+                            'scan_date' => Carbon::parse($log['scan_date']),
+                            'pin' => $log['pin'],
+                            'verifymode' => $log['verifymode'],
+                            'inoutmode' => $log['inoutmode'],
+                            'device_ip' => $log['device_ip'] ?? null,
+                            'is_processed' => false
+                        ]);
+                        $imported++;
+                    }
+                } catch (\Exception $e) {
+                    $errors[] = "Error importing log: " . $e->getMessage();
+                }
+            }
+
+            return [
+                'success' => true,
+                'imported' => $imported,
+                'total_found' => count($logs),
+                'errors' => $errors
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'imported' => 0,
+                'errors' => []
+            ];
+        }
+    }
+
+    /**
+     * Sync data from multiple att_log sources
+     */
+    public function syncFromMultipleSources($sources, $startDate, $endDate)
+    {
+        $totalImported = 0;
+        $allErrors = [];
+
+        foreach ($sources as $source) {
+            try {
+                if ($source['type'] === 'database') {
+                    $result = $this->importFromDatabase(
+                        $source['host'],
+                        $source['database'],
+                        $source['username'],
+                        $source['password'],
+                        $startDate,
+                        $endDate
+                    );
+                } else {
+                    // API source
+                    $fingerspotService = new FingerspotService();
+                    $result = $fingerspotService->importAndSaveAttlog($startDate, $endDate);
+                }
+
+                $totalImported += $result['imported'];
+                $allErrors = array_merge($allErrors, $result['errors']);
+
+                Log::info("Synced from source", [
+                    'source' => $source,
+                    'imported' => $result['imported'],
+                    'errors_count' => count($result['errors'])
+                ]);
+
+            } catch (\Exception $e) {
+                $allErrors[] = "Error syncing from source: " . $e->getMessage();
+                Log::error("Source sync error", [
+                    'source' => $source,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
+        return [
+            'total_imported' => $totalImported,
+            'errors' => $allErrors
         ];
     }
 
     /**
-     * Set timezone mesin
+     * Cleanup old processed logs
      */
-    public function setDeviceTime()
+    public function cleanupOldLogs($days = 30)
     {
-        try {
-            $currentTime = now()->format('Y-m-d H:i:s');
-            
-            $response = Http::timeout(30)->post("{$this->apiUrl}/api/settime", [
-                'datetime' => $currentTime
-            ]);
+        $cutoffDate = Carbon::now()->subDays($days);
+        
+        $deleted = AttendanceLog::where('is_processed', true)
+            ->where('scan_date', '<', $cutoffDate)
+            ->delete();
 
-            return $response->successful();
-        } catch (\Exception $e) {
-            Log::error("Error setting device time", ['error' => $e->getMessage()]);
-            return false;
-        }
-    }
+        Log::info("Cleaned up old attendance logs", [
+            'deleted_count' => $deleted,
+            'cutoff_date' => $cutoffDate->format('Y-m-d')
+        ]);
 
-    /**
-     * Restart mesin fingerprint
-     */
-    public function restartDevice()
-    {
-        try {
-            $response = Http::timeout(30)->post("{$this->apiUrl}/api/restart");
-            return $response->successful();
-        } catch (\Exception $e) {
-            Log::error("Error restarting device", ['error' => $e->getMessage()]);
-            return false;
-        }
+        return $deleted;
     }
 }

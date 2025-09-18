@@ -1,5 +1,5 @@
 <?php
-// app/Models/AttendanceLog.php (NEW)
+// app/Models/AttendanceLog.php (UPDATED for att_log table structure)
 
 namespace App\Models;
 
@@ -11,20 +11,71 @@ class AttendanceLog extends Model
 {
     use HasFactory;
 
-    protected $table = 'attendance_log';
-    protected $primaryKey = 'log_id';
-    public $timestamps = true;
+    protected $table = 'att_log'; // Changed table name
+    
+    // Composite primary key - Laravel doesn't support this natively
+    // We'll use sn + scan_date + pin as unique identifier
+    public $incrementing = false;
+    protected $primaryKey = ['sn', 'scan_date', 'pin'];
+    public $timestamps = false; // att_log table doesn't have created_at/updated_at
 
     protected $fillable = [
-        'device_sn', 'pin', 'scan_time', 'verify_mode', 
-        'inout_mode', 'device_ip', 'is_processed', 'processed_at'
+        'sn',           // device serial number (was device_sn)
+        'scan_date',    // scan datetime (was scan_time) 
+        'pin',          // employee pin (same)
+        'verifymode',   // verification mode (was verify_mode)
+        'inoutmode',    // in/out mode (was inout_mode)
+        'device_ip',    // device IP (same)
+        'is_processed', // add this for processing tracking
+        'processed_at'  // add this for processing timestamp
     ];
 
     protected $casts = [
-        'scan_time' => 'datetime',
+        'scan_date' => 'datetime',
         'processed_at' => 'datetime',
         'is_processed' => 'boolean'
     ];
+
+    /**
+     * Override getKeyName for composite key
+     */
+    public function getKeyName()
+    {
+        return ['sn', 'scan_date', 'pin'];
+    }
+
+    /**
+     * Override setKeysForSaveQuery for composite key
+     */
+    protected function setKeysForSaveQuery($query)
+    {
+        $keys = $this->getKeyName();
+        if (!is_array($keys)) {
+            return parent::setKeysForSaveQuery($query);
+        }
+
+        foreach ($keys as $keyName) {
+            $query->where($keyName, '=', $this->getKeyForSaveQuery($keyName));
+        }
+
+        return $query;
+    }
+
+    /**
+     * Override getKeyForSaveQuery for composite key
+     */
+    protected function getKeyForSaveQuery($keyName = null)
+    {
+        if (is_null($keyName)) {
+            $keyName = $this->getKeyName();
+        }
+
+        if (isset($this->original[$keyName])) {
+            return $this->original[$keyName];
+        }
+
+        return $this->getAttribute($keyName);
+    }
 
     public function karyawan(): BelongsTo
     {
@@ -39,17 +90,17 @@ class AttendanceLog extends Model
 
     public function scopeCheckIn($query)
     {
-        return $query->where('inout_mode', 1);
+        return $query->where('inoutmode', 1);
     }
 
     public function scopeCheckOut($query)
     {
-        return $query->where('inout_mode', 2);
+        return $query->where('inoutmode', 2);
     }
 
     public function scopeByDate($query, $date)
     {
-        return $query->whereDate('scan_time', $date);
+        return $query->whereDate('scan_date', $date);
     }
 
     public function scopeByPin($query, $pin)
@@ -57,20 +108,25 @@ class AttendanceLog extends Model
         return $query->where('pin', $pin);
     }
 
+    public function scopeBySN($query, $sn)
+    {
+        return $query->where('sn', $sn);
+    }
+
     // Helper methods
     public function isCheckIn()
     {
-        return $this->inout_mode === 1;
+        return $this->inoutmode === 1;
     }
 
     public function isCheckOut()
     {
-        return $this->inout_mode === 2;
+        return $this->inoutmode === 2;
     }
 
     public function getVerifyMethodAttribute()
     {
-        return $this->verify_mode === 1 ? 'Fingerprint' : 'Password';
+        return $this->verifymode === 1 ? 'Fingerprint' : 'Password';
     }
 
     public function markAsProcessed()
@@ -79,5 +135,36 @@ class AttendanceLog extends Model
             'is_processed' => true,
             'processed_at' => now()
         ]);
+    }
+
+    /**
+     * Find by composite key
+     */
+    public static function findByCompositeKey($sn, $scan_date, $pin)
+    {
+        return static::where('sn', $sn)
+                    ->where('scan_date', $scan_date)
+                    ->where('pin', $pin)
+                    ->first();
+    }
+
+    /**
+     * Create or find by composite key
+     */
+    public static function findOrCreateByCompositeKey($sn, $scan_date, $pin, $attributes = [])
+    {
+        $instance = static::findByCompositeKey($sn, $scan_date, $pin);
+        
+        if (!$instance) {
+            $attributes = array_merge([
+                'sn' => $sn,
+                'scan_date' => $scan_date,
+                'pin' => $pin
+            ], $attributes);
+            
+            $instance = static::create($attributes);
+        }
+        
+        return $instance;
     }
 }

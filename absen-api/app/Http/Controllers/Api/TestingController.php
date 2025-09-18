@@ -1,4 +1,5 @@
 <?php
+// app/Http/Controllers/Api/TestingController.php (UPDATED for att_log structure)
 
 namespace App\Http\Controllers\Api;
 
@@ -52,13 +53,13 @@ class TestingController extends Controller
             $date = Carbon::parse($request->date);
             $checkInTime = $date->copy()->setTimeFromTimeString($request->check_in_time);
             
-            // Create check-in log
+            // Create check-in log dengan struktur att_log
             $checkInLog = AttendanceLog::create([
-                'device_sn' => 'TESTING_DEVICE',
+                'sn' => 'TESTING_DEVICE_001', // Updated field name
                 'pin' => $karyawan->pin_fingerprint,
-                'scan_time' => $checkInTime,
-                'verify_mode' => 1,
-                'inout_mode' => 1,
+                'scan_date' => $checkInTime, // Updated field name
+                'verifymode' => 1, // Updated field name
+                'inoutmode' => 1, // Updated field name
                 'device_ip' => '127.0.0.1',
                 'is_processed' => false
             ]);
@@ -70,11 +71,11 @@ class TestingController extends Controller
                 $checkOutTime = $date->copy()->setTimeFromTimeString($request->check_out_time);
                 
                 $checkOutLog = AttendanceLog::create([
-                    'device_sn' => 'TESTING_DEVICE',
+                    'sn' => 'TESTING_DEVICE_001',
                     'pin' => $karyawan->pin_fingerprint,
-                    'scan_time' => $checkOutTime,
-                    'verify_mode' => 1,
-                    'inout_mode' => 2,
+                    'scan_date' => $checkOutTime,
+                    'verifymode' => 1,
+                    'inoutmode' => 2,
                     'device_ip' => '127.0.0.1',
                     'is_processed' => false
                 ]);
@@ -100,19 +101,20 @@ class TestingController extends Controller
                 'process_result' => $processResult
             ]);
 
-       } catch (\Throwable $e) {
-        \Log::error('TestingController Error', [
-            'msg' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-        ]);
+        } catch (\Throwable $e) {
+            DB::rollback();
+            \Log::error('TestingController Error', [
+                'msg' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
 
-        return response()->json([
-            'message' => 'Failed to create sample attendance',
-            'error'   => $e->getMessage(),
-            'file'    => $e->getFile(),
-            'line'    => $e->getLine(),
-        ], 500);
-    }
+            return response()->json([
+                'message' => 'Failed to create sample attendance',
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ], 500);
+        }
     }
 
     /**
@@ -171,23 +173,23 @@ class TestingController extends Controller
                 $checkOutMinute = rand(0, 59);
                 $checkOut = $current->copy()->setTime($checkOutHour, $checkOutMinute);
 
-                // Create logs
+                // Create logs dengan struktur att_log
                 AttendanceLog::create([
-                    'device_sn' => 'TESTING_DEVICE',
+                    'sn' => 'TESTING_DEVICE_' . str_pad($karyawan->karyawan_id, 3, '0', STR_PAD_LEFT),
                     'pin' => $karyawan->pin_fingerprint,
-                    'scan_time' => $checkIn,
-                    'verify_mode' => 1,
-                    'inout_mode' => 1,
+                    'scan_date' => $checkIn,
+                    'verifymode' => 1,
+                    'inoutmode' => 1,
                     'device_ip' => '127.0.0.1',
                     'is_processed' => false
                 ]);
 
                 AttendanceLog::create([
-                    'device_sn' => 'TESTING_DEVICE',
+                    'sn' => 'TESTING_DEVICE_' . str_pad($karyawan->karyawan_id, 3, '0', STR_PAD_LEFT),
                     'pin' => $karyawan->pin_fingerprint,
-                    'scan_time' => $checkOut,
-                    'verify_mode' => 1,
-                    'inout_mode' => 2,
+                    'scan_date' => $checkOut,
+                    'verifymode' => 1,
+                    'inoutmode' => 2,
                     'device_ip' => '127.0.0.1',
                     'is_processed' => false
                 ]);
@@ -249,23 +251,26 @@ class TestingController extends Controller
         try {
             DB::beginTransaction();
 
-            // Delete testing attendance logs
-            $deletedLogs = AttendanceLog::where('device_sn', 'TESTING_DEVICE')->delete();
+            // Delete testing attendance logs (dengan prefix TESTING_DEVICE)
+            $deletedLogs = AttendanceLog::where('sn', 'LIKE', 'TESTING_DEVICE%')->delete();
             
-            // Delete related absensi records
+            // Delete related absensi records untuk testing PINs
             $testPins = Karyawan::whereNotNull('pin_fingerprint')
                 ->pluck('pin_fingerprint')
                 ->toArray();
             
             $deletedAbsensi = 0;
             if (!empty($testPins)) {
-                // Get karyawan IDs from test PINs
+                // Get karyawan IDs dari test PINs
                 $testKaryawanIds = Karyawan::whereIn('pin_fingerprint', $testPins)
                     ->pluck('karyawan_id')
                     ->toArray();
                 
                 if (!empty($testKaryawanIds)) {
-                    $deletedAbsensi = Absensi::whereIn('karyawan_id', $testKaryawanIds)->delete();
+                    // Only delete absensi yang mungkin dari testing
+                    $deletedAbsensi = Absensi::whereIn('karyawan_id', $testKaryawanIds)
+                        ->whereDate('created_at', '>=', Carbon::today()->subDays(7)) // Only recent data
+                        ->delete();
                 }
             }
 
@@ -287,7 +292,7 @@ class TestingController extends Controller
     }
 
     /**
-     * Get attendance summary for testing
+     * Get attendance summary untuk testing
      */
     public function getAttendanceSummary($periode): JsonResponse
     {
@@ -316,9 +321,19 @@ class TestingController extends Controller
         // Get active setting
         $setting = SettingGaji::getActiveSetting();
 
+        // Get att_log statistics
+        $attLogStats = [
+            'total_logs' => AttendanceLog::count(),
+            'processed_logs' => AttendanceLog::where('is_processed', true)->count(),
+            'unprocessed_logs' => AttendanceLog::where('is_processed', false)->count(),
+            'testing_logs' => AttendanceLog::where('sn', 'LIKE', 'TESTING_DEVICE%')->count(),
+            'devices' => AttendanceLog::distinct('sn')->pluck('sn')
+        ];
+
         return response()->json([
             'periode' => $periode,
             'summary' => $summary,
+            'att_log_stats' => $attLogStats,
             'active_setting' => $setting ? [
                 'premi_produksi' => $setting->premi_produksi,
                 'premi_staff' => $setting->premi_staff,
@@ -329,7 +344,7 @@ class TestingController extends Controller
     }
 
     /**
-     * Test calculation for specific scenario
+     * Test calculation untuk specific scenario
      */
     public function testCalculation(Request $request): JsonResponse
     {
@@ -350,7 +365,7 @@ class TestingController extends Controller
                 $request->hadir_6_hari
             );
 
-            // Get active setting for reference
+            // Get active setting untuk reference
             $setting = SettingGaji::getActiveSetting();
 
             return response()->json([
@@ -377,7 +392,7 @@ class TestingController extends Controller
     }
 
     /**
-     * Generate sample data for all karyawan
+     * Generate sample data untuk semua karyawan
      */
     public function generateSampleDataForAll(Request $request): JsonResponse
     {
@@ -392,13 +407,13 @@ class TestingController extends Controller
             $results = [];
 
             foreach ($karyawanList as $karyawan) {
-                // Generate PIN if doesn't exist
+                // Generate PIN jika belum ada
                 if (!$karyawan->pin_fingerprint) {
                     $pin = str_pad($karyawan->karyawan_id, 5, '0', STR_PAD_LEFT);
                     $karyawan->update(['pin_fingerprint' => $pin]);
                 }
 
-                // Generate attendance for the period
+                // Generate attendance untuk periode tersebut
                 $year = substr($request->periode, 0, 4);
                 $month = substr($request->periode, 5, 2);
                 $startDate = Carbon::create($year, $month, 1);
@@ -410,7 +425,7 @@ class TestingController extends Controller
                 while ($current <= $endDate) {
                     $jenisHari = HariLibur::getJenisHari($current);
                     
-                    // Different patterns for different roles
+                    // Different patterns untuk different roles
                     if ($karyawan->role_karyawan === 'staff') {
                         // Staff: no weekend work usually
                         if ($jenisHari === 'weekend' && rand(1, 10) > 2) {
@@ -429,23 +444,23 @@ class TestingController extends Controller
                     $checkIn = $current->copy()->setTime(8, 0)->addMinutes(rand(-15, 30));
                     $checkOut = $current->copy()->setTime(17, 0)->addMinutes(rand(0, 180)); // 0-3 hours overtime
 
-                    // Create logs
+                    // Create logs dengan struktur att_log
                     AttendanceLog::create([
-                        'device_sn' => 'TESTING_DEVICE',
+                        'sn' => 'BULK_TEST_DEVICE',
                         'pin' => $karyawan->pin_fingerprint,
-                        'scan_time' => $checkIn,
-                        'verify_mode' => 1,
-                        'inout_mode' => 1,
+                        'scan_date' => $checkIn,
+                        'verifymode' => 1,
+                        'inoutmode' => 1,
                         'device_ip' => '127.0.0.1',
                         'is_processed' => false
                     ]);
 
                     AttendanceLog::create([
-                        'device_sn' => 'TESTING_DEVICE',
+                        'sn' => 'BULK_TEST_DEVICE',
                         'pin' => $karyawan->pin_fingerprint,
-                        'scan_time' => $checkOut,
-                        'verify_mode' => 1,
-                        'inout_mode' => 2,
+                        'scan_date' => $checkOut,
+                        'verifymode' => 1,
+                        'inoutmode' => 2,
                         'device_ip' => '127.0.0.1',
                         'is_processed' => false
                     ]);
@@ -456,6 +471,7 @@ class TestingController extends Controller
 
                 $results[] = [
                     'karyawan' => $karyawan->nama_lengkap,
+                    'pin' => $karyawan->pin_fingerprint,
                     'days_generated' => $generated
                 ];
             }
@@ -466,8 +482,9 @@ class TestingController extends Controller
             DB::commit();
 
             return response()->json([
-                'message' => 'Sample data generated for all karyawan',
+                'message' => 'Sample data generated untuk semua karyawan',
                 'periode' => $request->periode,
+                'karyawan_count' => $karyawanList->count(),
                 'results' => $results,
                 'process_result' => $processResult
             ]);
@@ -476,6 +493,343 @@ class TestingController extends Controller
             DB::rollback();
             return response()->json([
                 'message' => 'Failed to generate sample data',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Simulate multiple devices
+     */
+    public function simulateMultipleDevices(Request $request): JsonResponse
+    {
+        $request->validate([
+            'devices' => 'required|array|min:1|max:5',
+            'devices.*.sn' => 'required|string',
+            'devices.*.ip' => 'required|ip',
+            'start_date' => 'required|date_format:Y-m-d',
+            'days' => 'required|integer|min:1|max:31'
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $totalGenerated = 0;
+            $deviceResults = [];
+
+            foreach ($request->devices as $deviceConfig) {
+                $deviceGenerated = 0;
+                $startDate = Carbon::parse($request->start_date);
+
+                // Get random karyawan untuk device ini
+                $karyawanList = Karyawan::where('status', 'Aktif')
+                    ->whereNotNull('pin_fingerprint')
+                    ->inRandomOrder()
+                    ->take(rand(3, 8)) // 3-8 karyawan per device
+                    ->get();
+
+                foreach ($karyawanList as $karyawan) {
+                    for ($i = 0; $i < $request->days; $i++) {
+                        $date = $startDate->copy()->addDays($i);
+                        
+                        // Skip weekend randomly
+                        if ($date->isWeekend() && rand(1, 10) > 4) continue;
+                        
+                        // Random absence
+                        if (rand(1, 20) === 1) continue;
+
+                        // Check in
+                        $checkIn = $date->copy()->setTime(8, rand(0, 45));
+                        AttendanceLog::create([
+                            'sn' => $deviceConfig['sn'],
+                            'pin' => $karyawan->pin_fingerprint,
+                            'scan_date' => $checkIn,
+                            'verifymode' => rand(1, 2), // Mix fingerprint and password
+                            'inoutmode' => 1,
+                            'device_ip' => $deviceConfig['ip'],
+                            'is_processed' => false
+                        ]);
+
+                        // Check out
+                        $checkOut = $date->copy()->setTime(17, rand(0, 240)); // Up to 4 hours overtime
+                        AttendanceLog::create([
+                            'sn' => $deviceConfig['sn'],
+                            'pin' => $karyawan->pin_fingerprint,
+                            'scan_date' => $checkOut,
+                            'verifymode' => rand(1, 2),
+                            'inoutmode' => 2,
+                            'device_ip' => $deviceConfig['ip'],
+                            'is_processed' => false
+                        ]);
+
+                        $deviceGenerated++;
+                    }
+                }
+
+                $deviceResults[] = [
+                    'sn' => $deviceConfig['sn'],
+                    'ip' => $deviceConfig['ip'],
+                    'karyawan_count' => $karyawanList->count(),
+                    'days_generated' => $deviceGenerated,
+                    'total_logs' => $deviceGenerated * 2
+                ];
+
+                $totalGenerated += $deviceGenerated * 2;
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Multiple device simulation completed',
+                'devices_simulated' => count($request->devices),
+                'total_logs_generated' => $totalGenerated,
+                'device_results' => $deviceResults,
+                'note' => 'Use /fingerprint/process-logs to process these logs into attendance records'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json([
+                'message' => 'Failed to simulate multiple devices',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get detailed att_log analysis
+     */
+    public function getAttLogAnalysis(Request $request): JsonResponse
+    {
+        $request->validate([
+            'start_date' => 'nullable|date_format:Y-m-d',
+            'end_date' => 'nullable|date_format:Y-m-d',
+            'sn' => 'nullable|string'
+        ]);
+
+        try {
+            $query = AttendanceLog::query();
+
+            if ($request->start_date) {
+                $query->whereDate('scan_date', '>=', $request->start_date);
+            }
+
+            if ($request->end_date) {
+                $query->whereDate('scan_date', '<=', $request->end_date);
+            }
+
+            if ($request->sn) {
+                $query->where('sn', $request->sn);
+            }
+
+            // Overall statistics
+            $totalLogs = $query->count();
+            $processedLogs = (clone $query)->where('is_processed', true)->count();
+            $unprocessedLogs = (clone $query)->where('is_processed', false)->count();
+
+            // Device statistics
+            $deviceStats = (clone $query)
+                ->selectRaw('
+                    sn,
+                    device_ip,
+                    COUNT(*) as total_logs,
+                    COUNT(CASE WHEN is_processed = 1 THEN 1 END) as processed,
+                    COUNT(CASE WHEN is_processed = 0 THEN 1 END) as unprocessed,
+                    COUNT(CASE WHEN inoutmode = 1 THEN 1 END) as check_ins,
+                    COUNT(CASE WHEN inoutmode = 2 THEN 1 END) as check_outs,
+                    MIN(scan_date) as first_scan,
+                    MAX(scan_date) as last_scan
+                ')
+                ->groupBy('sn', 'device_ip')
+                ->get();
+
+            // Employee statistics
+            $employeeStats = (clone $query)
+                ->selectRaw('
+                    pin,
+                    COUNT(*) as total_scans,
+                    COUNT(CASE WHEN inoutmode = 1 THEN 1 END) as check_ins,
+                    COUNT(CASE WHEN inoutmode = 2 THEN 1 END) as check_outs,
+                    COUNT(CASE WHEN is_processed = 1 THEN 1 END) as processed_scans
+                ')
+                ->groupBy('pin')
+                ->with(['karyawan:karyawan_id,pin_fingerprint,nama_lengkap,role_karyawan'])
+                ->orderBy('total_scans', 'desc')
+                ->limit(20)
+                ->get();
+
+            // Verification mode statistics
+            $verifyModeStats = (clone $query)
+                ->selectRaw('
+                    verifymode,
+                    COUNT(*) as count,
+                    CASE 
+                        WHEN verifymode = 1 THEN "Fingerprint"
+                        WHEN verifymode = 2 THEN "Password/PIN"
+                        WHEN verifymode = 3 THEN "Card"
+                        WHEN verifymode = 4 THEN "Face"
+                        WHEN verifymode = 5 THEN "Palm Vein"
+                        ELSE "Unknown"
+                    END as method_name
+                ')
+                ->groupBy('verifymode')
+                ->get();
+
+            // Daily activity pattern
+            $dailyPattern = (clone $query)
+                ->selectRaw('
+                    DATE(scan_date) as date,
+                    COUNT(*) as total_scans,
+                    COUNT(CASE WHEN inoutmode = 1 THEN 1 END) as check_ins,
+                    COUNT(CASE WHEN inoutmode = 2 THEN 1 END) as check_outs
+                ')
+                ->groupBy('date')
+                ->orderBy('date', 'desc')
+                ->limit(30)
+                ->get();
+
+            // Hourly pattern
+            $hourlyPattern = (clone $query)
+                ->selectRaw('
+                    HOUR(scan_date) as hour,
+                    COUNT(*) as total_scans,
+                    COUNT(CASE WHEN inoutmode = 1 THEN 1 END) as check_ins,
+                    COUNT(CASE WHEN inoutmode = 2 THEN 1 END) as check_outs
+                ')
+                ->groupBy('hour')
+                ->orderBy('hour')
+                ->get();
+
+            return response()->json([
+                'period' => [
+                    'start_date' => $request->start_date,
+                    'end_date' => $request->end_date,
+                    'device_filter' => $request->sn
+                ],
+                'overview' => [
+                    'total_logs' => $totalLogs,
+                    'processed_logs' => $processedLogs,
+                    'unprocessed_logs' => $unprocessedLogs,
+                    'processing_rate' => $totalLogs > 0 ? round(($processedLogs / $totalLogs) * 100, 2) : 0
+                ],
+                'device_statistics' => $deviceStats,
+                'employee_statistics' => $employeeStats,
+                'verification_methods' => $verifyModeStats,
+                'daily_activity' => $dailyPattern,
+                'hourly_pattern' => $hourlyPattern
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to generate att_log analysis',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Validate data integrity
+     */
+    public function validateDataIntegrity(): JsonResponse
+    {
+        try {
+            $issues = [];
+
+            // Check for orphaned attendance logs (PIN tidak ada di karyawan)
+            $orphanedLogs = AttendanceLog::whereNotIn('pin', function($query) {
+                $query->select('pin_fingerprint')
+                      ->from('karyawan')
+                      ->whereNotNull('pin_fingerprint');
+            })->count();
+
+            if ($orphanedLogs > 0) {
+                $issues[] = [
+                    'type' => 'orphaned_logs',
+                    'count' => $orphanedLogs,
+                    'description' => 'Attendance logs with PINs not found in karyawan table'
+                ];
+            }
+
+            // Check for karyawan without PIN
+            $karyawanWithoutPin = Karyawan::where('status', 'Aktif')
+                ->whereNull('pin_fingerprint')
+                ->count();
+
+            if ($karyawanWithoutPin > 0) {
+                $issues[] = [
+                    'type' => 'missing_pins',
+                    'count' => $karyawanWithoutPin,
+                    'description' => 'Active karyawan without PIN fingerprint'
+                ];
+            }
+
+            // Check for unmatched check-ins/check-outs
+            $unmatchedCheckIns = AttendanceLog::where('inoutmode', 1)
+                ->where('is_processed', false)
+                ->whereNotExists(function($query) {
+                    $query->select('*')
+                          ->from('att_log as checkout')
+                          ->whereColumn('checkout.pin', 'att_log.pin')
+                          ->whereColumn('checkout.sn', 'att_log.sn')
+                          ->whereRaw('DATE(checkout.scan_date) = DATE(att_log.scan_date)')
+                          ->where('checkout.inoutmode', 2);
+                })
+                ->count();
+
+            if ($unmatchedCheckIns > 0) {
+                $issues[] = [
+                    'type' => 'unmatched_checkins',
+                    'count' => $unmatchedCheckIns,
+                    'description' => 'Check-in logs without corresponding check-out'
+                ];
+            }
+
+            // Check for duplicate logs
+            $duplicateLogs = AttendanceLog::selectRaw('sn, pin, scan_date, COUNT(*) as count')
+                ->groupBy('sn', 'pin', 'scan_date')
+                ->having('count', '>', 1)
+                ->count();
+
+            if ($duplicateLogs > 0) {
+                $issues[] = [
+                    'type' => 'duplicate_logs',
+                    'count' => $duplicateLogs,
+                    'description' => 'Duplicate attendance logs (same sn, pin, scan_date)'
+                ];
+            }
+
+            // Check for absensi without corresponding att_log
+            $absensiWithoutLogs = Absensi::whereNotExists(function($query) {
+                $query->select('*')
+                      ->from('att_log')
+                      ->join('karyawan', 'att_log.pin', '=', 'karyawan.pin_fingerprint')
+                      ->whereColumn('karyawan.karyawan_id', 'absensi.karyawan_id')
+                      ->whereRaw('DATE(att_log.scan_date) = absensi.tanggal_absensi');
+            })->count();
+
+            if ($absensiWithoutLogs > 0) {
+                $issues[] = [
+                    'type' => 'absensi_without_logs',
+                    'count' => $absensiWithoutLogs,
+                    'description' => 'Absensi records without corresponding att_log entries'
+                ];
+            }
+
+            return response()->json([
+                'message' => 'Data integrity validation completed',
+                'total_issues' => count($issues),
+                'issues' => $issues,
+                'recommendations' => [
+                    'Run cleanup commands to fix orphaned data',
+                    'Assign PIN fingerprint to active karyawan',
+                    'Process unprocessed logs to create absensi records',
+                    'Remove duplicate logs if necessary'
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to validate data integrity',
                 'error' => $e->getMessage()
             ], 500);
         }

@@ -1,0 +1,141 @@
+======================================================================
+         RENCANA PENGUJIAN API KOMPREHENSIF (FULL TEST PLAN)
+======================================================================
+Deskripsi: Dokumen ini berisi kumpulan test case untuk menguji seluruh
+fungsionalitas API HRIS berdasarkan file `api.php` dan logika bisnis
+yang terkandung dalam file-file controller, service, dan model yang
+telah dianalisis.
+
+Pra-syarat Umum:
+1.  **Aktor Pengujian**: Siapkan token otentikasi (Bearer Token) untuk
+    setiap peran pengguna: 'it_dev', 'hr', 'direktur', dan 'karyawan'.
+2.  **Data Seed**: Gunakan file `absen.sql` untuk mengisi database
+    pengujian agar memiliki data awal yang konsisten.
+3.  **Lingkungan**: Lakukan pengujian pada environment terisolasi.
+
+======================================================================
+               BAGIAN 1: OTENTIKASI & PENGGUNA
+======================================================================
+Controller: AuthController.php
+----------------------------------------------------------------------
+
+### Endpoint: `POST /api/login`
+| Test Case                 | Aktor/Role | Request Body                                | Expected Status | Verifikasi Kunci                                       |
+|---------------------------|------------|---------------------------------------------|-----------------|--------------------------------------------------------|
+| Login sukses              | Publik     | `{ "nik": "2222", "password": "..." }`      | 200 OK          | Dapatkan `access_token` dan data `user` yang sesuai. |
+| Login gagal (NIK salah)     | Publik     | `{ "nik": "99999", "password": "..." }`   | 401 Unauthorized| Pesan error: "NIK atau Password salah."                  |
+| Login gagal (Password salah)| Publik     | `{ "nik": "2222", "password": "salah" }`    | 401 Unauthorized| Pesan error: "NIK atau Password salah."                  |
+| Login gagal (validasi)    | Publik     | `{ "nik": "2222" }`                         | 422 Unprocessable | Error validasi untuk field `password`.                 |
+
+### Endpoint: `POST /api/logout`
+| Test Case       | Aktor/Role               | Request Body | Expected Status | Verifikasi Kunci                                         |
+|-----------------|--------------------------|--------------|-----------------|----------------------------------------------------------|
+| Logout sukses   | Semua (terotentikasi)    | -            | 200 OK          | Pesan: "Successfully logged out". Token menjadi tidak valid. |
+| Logout gagal    | Publik (tanpa token)     | -            | 401 Unauthorized| Pesan: "Unauthenticated."                                  |
+
+### Endpoint: `GET /api/user`
+| Test Case         | Aktor/Role            | Request Body | Expected Status | Verifikasi Kunci                                              |
+|-------------------|-----------------------|--------------|-----------------|---------------------------------------------------------------|
+| Get data user sukses| `karyawan` (terotentikasi) | -            | 200 OK          | Dapatkan data diri sendiri, termasuk relasi `departemenSaatIni`. |
+| Get data user gagal | Publik (tanpa token)  | -            | 401 Unauthorized| Pesan: "Unauthenticated."                                       |
+
+======================================================================
+               BAGIAN 2: MASTER DATA (DEPARTEMEN, JABATAN, SHIFT)
+======================================================================
+Controller: DepartemenController.php, JabatanController.php, ShiftController.php
+Otorisasi: Hanya 'hr' yang bisa Create, Update, Delete. 'direktur' bisa View.
+----------------------------------------------------------------------
+
+### Endpoint: `GET /api/departemen`, `GET /api/jabatan`, `GET /api/shift`
+| Test Case                | Aktor/Role        | Expected Status | Verifikasi Kunci                               |
+|--------------------------|-------------------|-----------------|------------------------------------------------|
+| Lihat semua data (sukses)| `hr`, `direktur`  | 200 OK          | Dapatkan array berisi data master.             |
+| Lihat semua data (gagal) | `karyawan`        | 403 Forbidden   | Pesan error otorisasi.                         |
+
+### Endpoint: `POST /api/departemen`, `POST /api/jabatan`, `POST /api/shift`
+| Test Case                | Aktor/Role        | Request Body (Contoh Departemen)                   | Expected Status | Verifikasi Kunci                               |
+|--------------------------|-------------------|----------------------------------------------------|-----------------|------------------------------------------------|
+| Tambah data (sukses)     | `hr`              | `{ "nama_departemen": "Gudang", "menggunakan_shift": true }` | 201 Created     | Data baru tersimpan di database.               |
+| Tambah data (gagal, duplikat) | `hr`              | `{ "nama_departemen": "IT / Developer", ... }`       | 422 Unprocessable | Error validasi "unique".                       |
+| Tambah data (gagal, otorisasi) | `direktur`, `karyawan` | (Body Valid)                                       | 403 Forbidden   | Pesan error otorisasi.                         |
+
+### Endpoint: `PUT /api/departemen/{id}`, `PUT /api/jabatan/{id}`, `PUT /api/shift/{id}`
+| Test Case                | Aktor/Role        | Request Body (Contoh Jabatan)          | Expected Status | Verifikasi Kunci                               |
+|--------------------------|-------------------|----------------------------------------|-----------------|------------------------------------------------|
+| Update data (sukses)     | `hr`              | `{ "nama_jabatan": "IT Manager" }`       | 200 OK          | Data di database ter-update.                   |
+| Update data (gagal, otorisasi) | `direktur`        | `{ "nama_jabatan": "IT Director" }`    | 403 Forbidden   | Pesan error otorisasi.                         |
+| Update data (gagal, not found) | `hr`              | `{ "nama_jabatan": "Test" }` (untuk ID 999) | 404 Not Found   | Pesan error "not found".                       |
+
+### Endpoint: `DELETE /api/departemen/{id}`, `DELETE /api/jabatan/{id}`, `DELETE /api/shift/{id}`
+| Test Case                       | Aktor/Role        | Target ID (Contoh)      | Expected Status | Verifikasi Kunci                                           |
+|---------------------------------|-------------------|-------------------------|-----------------|------------------------------------------------------------|
+| Hapus (gagal, masih digunakan)    | `hr`              | Departemen ID 1         | 422 Unprocessable | Pesan: "Cannot delete department with active employees".   |
+| Hapus (sukses, tidak digunakan)   | `hr`              | Jabatan ID 6 ("Test 2") | 204 No Content  | Data terhapus dari database.                               |
+| Hapus (gagal, otorisasi)        | `direktur`        | Jabatan ID 6            | 403 Forbidden   | Pesan error otorisasi.                                     |
+
+======================================================================
+               BAGIAN 3: MANAJEMEN KARYAWAN
+======================================================================
+Controller: KaryawanController.php
+----------------------------------------------------------------------
+
+### Endpoint: `POST /api/karyawan`
+| Test Case                 | Aktor/Role | Request Body                                                              | Expected Status | Verifikasi Kunci                                       |
+|---------------------------|------------|---------------------------------------------------------------------------|-----------------|--------------------------------------------------------|
+| Tambah Karyawan (sukses)  | `hr`       | (Body valid sesuai contoh dari user)                                      | 201 Created     | Data tersimpan di `karyawan` & `histori_jabatan`.    |
+| Tambah Karyawan (gagal, otorisasi) | `direktur` | (Body valid)                                                              | 403 Forbidden   | Pesan error otorisasi.                                   |
+| Tambah Karyawan (gagal, validasi) | `hr`       | `{ "nik": "1111" }` (NIK sudah ada)                                   | 422 Unprocessable | Error validasi.                                        |
+
+### Endpoint: `PUT /api/karyawan/{id}`
+| Test Case                 | Aktor/Role | Request Body                                        | Expected Status | Verifikasi Kunci                                       |
+|---------------------------|------------|-----------------------------------------------------|-----------------|--------------------------------------------------------|
+| Update data diri sendiri    | `karyawan` | `{ "nomor_telepon": "089988776655" }`                | 200 OK          | Nomor telepon di database berubah.                     |
+| Update oleh HR (sukses)   | `hr`       | `{ "nama_lengkap": "Nama Karyawan Update", ... }`   | 200 OK          | Data di database berubah.                              |
+| Update oleh HR (promosi)    | `hr`       | `{ "jabatan_id_saat_ini": 2, ... }`                  | 200 OK          | Histori jabatan lama ter-update, histori baru dibuat. |
+| Update (gagal, otorisasi) | `direktur` | (Body valid)                                        | 403 Forbidden   | Pesan error otorisasi.                                   |
+
+======================================================================
+               BAGIAN 4: PENGGAJIAN (PAYROLL)
+======================================================================
+Controller: PayrollController.php, GajiTambahanController.php
+----------------------------------------------------------------------
+
+### Endpoint: `POST /api/gaji-tambahan/calculate`
+| Test Case                                    | Aktor/Role | Request Body                                                                                     | Expected Status | Verifikasi Kunci (Berdasarkan `SettingGaji` ID 1)              |
+|----------------------------------------------|------------|--------------------------------------------------------------------------------------------------|-----------------|----------------------------------------------------------------|
+| Produksi, Weekday, Lembur, Dapat Uang Makan  | `hr`       | `{"role_karyawan": "produksi", "jenis_hari": "weekday", "jam_lembur": 3, "jam_selesai_kerja": "20:00", "hadir_6_hari": true}` | 200 OK          | `lembur_pay`: 30000, `premi`: 100000, `uang_makan`: 15000       |
+| Staff, Weekend, Lembur, Tidak Dapat Premi    | `hr`       | `{"role_karyawan": "staff", "jenis_hari": "weekend", "jam_lembur": 6, "jam_selesai_kerja": "15:00", "hadir_6_hari": false}` | 200 OK          | `lembur_pay`: 180000 (tarif x2), `premi`: 0, `uang_makan`: 25000 |
+
+### Endpoint: `POST /api/payroll/generate`
+| Test Case                 | Aktor/Role | Request Body                                | Expected Status | Verifikasi Kunci                                       |
+|---------------------------|------------|---------------------------------------------|-----------------|--------------------------------------------------------|
+| Generate Gaji (sukses)    | `hr`       | `{ "karyawan_id": 3, "periode": "2025-01" }`| 200 OK          | Record baru di `riwayat_gaji` & `detail_gaji`.         |
+| Generate Gaji (gagal, otorisasi) | `direktur` | `{ "karyawan_id": 3, "periode": "2025-01" }`| 403 Forbidden   | Pesan error otorisasi.                                   |
+
+### Endpoint: `GET /api/payroll/slip/{gaji_id}`
+| Test Case                      | Aktor/Role | Target Gaji ID (Contoh) | Expected Status | Verifikasi Kunci                                       |
+|--------------------------------|------------|-------------------------|-----------------|--------------------------------------------------------|
+| Lihat slip sendiri (sukses)      | `karyawan` | (ID gaji milik sendiri) | 200 OK          | Mendapatkan detail slip gaji.                          |
+| Lihat slip (gagal, otorisasi)    | `karyawan` | (ID gaji orang lain)    | 403 Forbidden   | Pesan error otorisasi.                                   |
+| Lihat slip apapun (sukses)       | `hr`       | (ID gaji siapa saja)    | 200 OK          | Mendapatkan detail slip gaji.                          |
+
+======================================================================
+               BAGIAN 5: FINGERPRINT & TESTING
+======================================================================
+Controller: FingerspotIntegrationController.php, TestingController.php
+----------------------------------------------------------------------
+
+### Endpoint: `POST /api/testing/create-sample-attendance`
+| Test Case                 | Aktor/Role | Request Body                                                                        | Expected Status | Verifikasi Kunci                                                              |
+|---------------------------|------------|-------------------------------------------------------------------------------------|-----------------|-------------------------------------------------------------------------------|
+| Buat log & proses (sukses)| `hr`, `it_dev` | `{"karyawan_id": 4, "date": "2025-01-20", "check_in_time": "08:10", "check_out_time": "20:00"}` | 200 OK          | 2 record baru di `att_log`, 1 record baru/update di `absensi`. |
+
+### Endpoint: `POST /api/fingerprint/process-logs`
+| Test Case                 | Aktor/Role | Request Body | Expected Status | Verifikasi Kunci                                                              |
+|---------------------------|------------|--------------|-----------------|-------------------------------------------------------------------------------|
+| Proses semua log (sukses) | `hr`, `it_dev` | -            | 200 OK          | `processed` > 0. Kolom `is_processed` di `att_log` menjadi `true`.          |
+
+### Endpoint: `GET /api/system/health`
+| Test Case                 | Aktor/Role | Request Body | Expected Status | Verifikasi Kunci                                                              |
+|---------------------------|------------|--------------|-----------------|-------------------------------------------------------------------------------|
+| Cek kesehatan sistem      | Semua (terotentikasi) | -            | 200 OK          | `status`: "healthy", berisi jumlah data dari beberapa tabel. |

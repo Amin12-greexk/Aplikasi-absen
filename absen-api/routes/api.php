@@ -499,10 +499,4 @@ Route::middleware('auth:sanctum')->group(function () {
             ]);
         });
     });
-
-    Route::get('/ngondol', function() {
-    return response()->json([
-        'status' => 'success',
-        'message' => 'Tepuk tangan 3 kali untuk ngondol!'
-    ]);
 });

@@ -60,15 +60,20 @@ class PayrollController extends Controller
         return response()->json($slip);
     }
 
+    // app/Http/Controllers/Api/PayrollController.php
     public function getAllPayrolls(Request $request): JsonResponse
     {
-        $periode = $request->get('periode');
+        $periode = $request->get('periode'); // format: Y-m
         $departemen_id = $request->get('departemen_id');
+        $tipe_periode = $request->get('tipe_periode'); // harian/mingguan/bulanan
 
         $query = RiwayatGaji::with(['karyawan.departemenSaatIni', 'karyawan.jabatanSaatIni']);
 
         if ($periode) {
-            $query->where('periode', $periode);
+            $year = substr($periode, 0, 4);
+            $month = substr($periode, 5, 2);
+            $query->whereYear('periode_mulai', $year)
+                ->whereMonth('periode_mulai', $month);
         }
 
         if ($departemen_id) {
@@ -77,7 +82,30 @@ class PayrollController extends Controller
             });
         }
 
-        $payrolls = $query->orderBy('periode', 'desc')->paginate(20);
+        if ($tipe_periode) {
+            $query->where('tipe_periode', $tipe_periode);
+        }
+
+        $payrolls = $query->orderBy('periode_mulai', 'desc')->paginate(20);
+
+        // Transform data untuk frontend
+        $payrolls->getCollection()->transform(function ($item) {
+            return [
+                'gaji_id' => $item->gaji_id,
+                'nik' => $item->karyawan->nik,
+                'nama_karyawan' => $item->karyawan->nama_lengkap,
+                'email' => $item->karyawan->email,
+                'departemen' => $item->karyawan->departemenSaatIni->nama_departemen,
+                'periode' => $item->periode_label, // Ini yang akan tampil di UI
+                'periode_raw' => $item->periode,
+                'tipe_periode' => $item->tipe_periode,
+                'tanggal_mulai' => $item->periode_mulai,
+                'tanggal_selesai' => $item->periode_selesai,
+                'total_gaji' => $item->gaji_final,
+                'status' => $item->status ?? 'draft', // Add status field
+                'tanggal_bayar' => $item->tanggal_pembayaran,
+            ];
+        });
 
         return response()->json($payrolls);
     }

@@ -498,5 +498,91 @@ Route::middleware('auth:sanctum')->group(function () {
                 'department_performance' => $performance
             ]);
         });
+        
     });
+    Route::post('payroll/generate-weekly', function(Request $request) {
+    $karyawanHarian = Karyawan::where('kategori_gaji', 'Harian')
+        ->where('periode_gaji', 'mingguan')
+        ->get();
+    
+    $weekStart = Carbon::now()->startOfWeek();
+    $weekEnd = Carbon::now()->endOfWeek();
+    
+    foreach ($karyawanHarian as $k) {
+        $payrollService->generateForDateRange(
+            $k->karyawan_id, 
+            $weekStart, 
+            $weekEnd, 
+            'mingguan'
+        );
+    }
+});
+
+// routes/api.php
+Route::post('payroll/generate-batch', function(Request $request) {
+    $request->validate([
+        'tipe_periode' => 'required|in:harian,mingguan',
+        'tanggal' => 'required|date'
+    ]);
+    
+    $results = [];
+    $errors = [];
+    $payrollService = app(PayrollService::class);
+    
+    if ($request->tipe_periode === 'harian') {
+        // Generate untuk hari tertentu
+        $tanggal = Carbon::parse($request->tanggal);
+        
+        $karyawanHarian = Karyawan::where('kategori_gaji', 'Harian')
+            ->where('periode_gaji', 'harian')
+            ->where('status', 'Aktif')
+            ->get();
+        
+        foreach ($karyawanHarian as $k) {
+            try {
+                $gaji = $payrollService->generateForDateRange(
+                    $k->karyawan_id,
+                    $tanggal->format('Y-m-d'),
+                    $tanggal->format('Y-m-d'),
+                    'harian'
+                );
+                $results[] = $gaji;
+            } catch (\Exception $e) {
+                $errors[] = ['karyawan' => $k->nama_lengkap, 'error' => $e->getMessage()];
+            }
+        }
+        
+    } elseif ($request->tipe_periode === 'mingguan') {
+        // Generate untuk minggu tertentu
+        $tanggal = Carbon::parse($request->tanggal);
+        $weekStart = $tanggal->startOfWeek();
+        $weekEnd = $tanggal->endOfWeek();
+        
+        $karyawanMingguan = Karyawan::where('kategori_gaji', 'Harian')
+            ->where('periode_gaji', 'mingguan')
+            ->where('status', 'Aktif')
+            ->get();
+        
+        foreach ($karyawanMingguan as $k) {
+            try {
+                $gaji = $payrollService->generateForDateRange(
+                    $k->karyawan_id,
+                    $weekStart->format('Y-m-d'),
+                    $weekEnd->format('Y-m-d'),
+                    'mingguan'
+                );
+                $results[] = $gaji;
+            } catch (\Exception $e) {
+                $errors[] = ['karyawan' => $k->nama_lengkap, 'error' => $e->getMessage()];
+            }
+        }
+    }
+    
+    return response()->json([
+        'success_count' => count($results),
+        'error_count' => count($errors),
+        'results' => $results,
+        'errors' => $errors
+    ]);
+});
 });

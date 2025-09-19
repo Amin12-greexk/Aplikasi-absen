@@ -62,4 +62,29 @@ class RiwayatGaji extends Model
                 return $this->periode;
         }
     }
+
+    // app/Models/RiwayatGaji.php
+    public function getPeriodeLabelAttribute()
+    {
+        if ($this->tipe_periode === 'harian') {
+            // Format: "15 Jan 2024"
+            return Carbon::parse($this->periode_mulai)->format('d M Y');
+        } elseif ($this->tipe_periode === 'mingguan') {
+            // Format: "15 - 21 Jan 2024"
+            $start = Carbon::parse($this->periode_mulai);
+            $end = Carbon::parse($this->periode_selesai);
+            
+            if ($start->month === $end->month) {
+                return $start->format('d') . ' - ' . $end->format('d M Y');
+            } else {
+                return $start->format('d M') . ' - ' . $end->format('d M Y');
+            }
+        } else {
+            // Bulanan: "Januari 2024"
+            return Carbon::parse($this->periode_mulai)->locale('id')->translatedFormat('F Y');
+        }
+    }
+
+    // Add to appends
+    protected $appends = ['periode_label'];
 }

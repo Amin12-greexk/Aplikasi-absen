@@ -124,34 +124,31 @@ class PayrollService
         });
     }
 
-    private function calculateGajiPokok(Karyawan $karyawan, Carbon $tanggal_mulai, Carbon $tanggal_selesai, string $tipe_periode): float
-    {
-        switch ($karyawan->kategori_gaji) {
-            case 'Bulanan':
-                if ($tipe_periode === 'bulanan') {
-                    return 5000000; // Full monthly salary
-                } else {
-                    // Pro-rate untuk periode partial
-                    $totalDaysInMonth = $tanggal_mulai->daysInMonth;
-                    $workingDays = $tanggal_mulai->diffInDays($tanggal_selesai) + 1;
-                    return (5000000 / $totalDaysInMonth) * $workingDays;
-                }
-                
-            case 'Harian':
-                $totalHariMasuk = Absensi::where('karyawan_id', $karyawan->karyawan_id)
-                    ->whereBetween('tanggal_absensi', [$tanggal_mulai, $tanggal_selesai])
-                    ->whereIn('status', ['Hadir', 'Terlambat'])
-                    ->count();
-                return $totalHariMasuk * 150000;
-                
-            case 'Borongan':
-                // Implementasi custom untuk borongan
-                return 0;
-                
-            default:
-                return 0;
+    private function calculateGajiPokok($karyawan, $tanggal_mulai, $tanggal_selesai) {
+    if ($karyawan->kategori_gaji === 'Harian') {
+        // Hitung berdasarkan jam kerja actual
+        $absensiDetails = Absensi::where('karyawan_id', $karyawan->karyawan_id)
+            ->whereBetween('tanggal_absensi', [$tanggal_mulai, $tanggal_selesai])
+            ->whereIn('status', ['Hadir', 'Terlambat'])
+            ->get();
+        
+        $totalGaji = 0;
+        foreach ($absensiDetails as $absen) {
+            $jamKerja = Carbon::parse($absen->jam_scan_masuk)
+                ->diffInHours($absen->jam_scan_pulang);
+            
+            if ($jamKerja >= 8) {
+                // Full day
+                $totalGaji += $karyawan->tarif_harian;
+            } elseif ($jamKerja >= 4) {
+                // Half day
+                $totalGaji += $karyawan->tarif_harian * 0.5;
+            }
+            // Else: no pay (< 4 hours)
         }
+        return $totalGaji;
     }
+}
 
     private function calculateGajiTambahanForPeriod(Karyawan $karyawan, Carbon $tanggal_mulai, Carbon $tanggal_selesai): array
     {

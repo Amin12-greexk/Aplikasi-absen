@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\SettingGajiController;
 use App\Http\Controllers\Api\GajiTambahanController;
 use App\Http\Controllers\Api\FingerspotIntegrationController;
 use App\Http\Controllers\Api\TestingController;
+use App\Models\Karyawan;
 
 // Endpoint publik
 Route::post('/login', [AuthController::class, 'login']);
@@ -520,6 +521,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // routes/api.php
 Route::post('payroll/generate-batch', function(Request $request) {
+    $payrollService = app(\App\Services\PayrollService::class);
     $request->validate([
         'tipe_periode' => 'required|in:harian,mingguan',
         'tanggal' => 'required|date'

@@ -22,7 +22,7 @@ class Karyawan extends Authenticatable
         'nik', 'nama_lengkap', 'tempat_lahir', 'tanggal_lahir', 'jenis_kelamin',
         'alamat', 'status_perkawinan', 'nomor_telepon', 'email', 'password', 'role',
         'tanggal_masuk', 'kategori_gaji', 'jam_kerja_masuk', 'jam_kerja_pulang', 
-        'status', 'departemen_id_saat_ini', 'jabatan_id_saat_ini',
+        'status', 'departemen_id_saat_ini', 'tarif_harian', 'jabatan_id_saat_ini',
         'pin_fingerprint', 'role_karyawan'  // ADDED
     ];
 

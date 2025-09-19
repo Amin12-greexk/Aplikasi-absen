@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\GajiTambahanController;
 use App\Http\Controllers\Api\FingerspotIntegrationController;
 use App\Http\Controllers\Api\TestingController;
 use App\Models\Karyawan;
+use Carbon\Carbon;
 
 // Endpoint publik
 Route::post('/login', [AuthController::class, 'login']);
@@ -509,6 +510,7 @@ Route::middleware('auth:sanctum')->group(function () {
     $weekStart = Carbon::now()->startOfWeek();
     $weekEnd = Carbon::now()->endOfWeek();
     
+    $payrollService = app(\App\Services\PayrollService::class);
     foreach ($karyawanHarian as $k) {
         $payrollService->generateForDateRange(
             $k->karyawan_id, 
@@ -521,7 +523,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // routes/api.php
 Route::post('payroll/generate-batch', function(Request $request) {
-    $payrollService = app(\App\Services\PayrollService::class);
     $request->validate([
         'tipe_periode' => 'required|in:harian,mingguan',
         'tanggal' => 'required|date'

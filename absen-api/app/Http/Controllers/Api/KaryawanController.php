@@ -22,6 +22,7 @@ class KaryawanController extends Controller
     {
         // Validasi input dari frontend (pastikan lengkap)
         $validatedData = $request->validate([
+            
             'nik' => 'required|string|max:20|unique:karyawan,nik',
             'nama_lengkap' => 'required|string|max:255',
             'email' => 'required|email|max:255|unique:karyawan,email',
@@ -31,6 +32,7 @@ class KaryawanController extends Controller
             'tempat_lahir' => 'nullable|string|max:100',
             'tanggal_lahir' => 'nullable|date',
             'jenis_kelamin' => 'required|in:Laki-laki,Perempuan',
+            'tarif_harian' => 'nullable|numeric|min:0',
             'status_perkawinan' => 'required|in:Belum Menikah,Menikah,Cerai',
             'kategori_gaji' => 'required|in:Bulanan,Harian,Borongan',
             'status' => 'required|in:Aktif,Resign',
@@ -77,6 +79,7 @@ class KaryawanController extends Controller
             'nomor_telepon' => 'required|string|max:20',
             'email' => 'required|email|max:255|unique:karyawan,email,' . $karyawan->karyawan_id . ',karyawan_id',
             'tanggal_masuk' => 'required|date',
+            'tarif_harian' => 'nullable|numeric|min:0',
             'kategori_gaji' => 'required|in:Bulanan,Harian,Borongan',
             'jam_kerja_masuk' => 'nullable|date_format:H:i:s',
             'jam_kerja_pulang' => 'nullable|date_format:H:i:s',

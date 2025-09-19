@@ -237,6 +237,34 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/import-attendance', [FingerspotIntegrationController::class, 'importAttendance']);
         Route::post('/set-time', [FingerspotIntegrationController::class, 'setDeviceTime']);
         Route::post('/restart', [FingerspotIntegrationController::class, 'restartDevice']);
+
+         Route::get('/logs', function (Request $request) {
+        $query = AttendanceLog::with('karyawan');
+
+        if ($request->start_date) {
+            $query->whereDate('scan_time', '>=', $request->start_date);
+        }
+
+        if ($request->end_date) {
+            $query->whereDate('scan_time', '<=', $request->end_date);
+        }
+
+        if ($request->pin) {
+            $query->where('pin', $request->pin);
+        }
+
+        if ($request->sn) {
+            $query->where('device_sn', $request->sn);
+        }
+
+        if ($request->has('is_processed')) {
+            $query->where('is_processed', (int) $request->is_processed);
+        }
+
+        return response()->json(
+            $query->orderBy('scan_time', 'desc')->paginate(20)
+        );
+    });
     });
 
     // ========================================

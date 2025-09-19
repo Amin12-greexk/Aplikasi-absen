@@ -33,12 +33,12 @@ class PayrollService
         }
 
         return $this->generatePayrollForDateRange(
-            $karyawan,
-            $payrollPeriod->tanggal_mulai,
-            $payrollPeriod->tanggal_selesai,
-            $payrollPeriod->tipe_periode,
-            $period_id
-        );
+    $karyawan,
+    Carbon::parse($payrollPeriod->tanggal_mulai),
+    Carbon::parse($payrollPeriod->tanggal_selesai),
+    $payrollPeriod->tipe_periode,
+    $period_id
+);
     }
 
     /**

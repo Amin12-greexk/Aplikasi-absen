@@ -11,6 +11,7 @@ use App\Models\HariLibur;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 
 class FingerspotService
 {
@@ -20,6 +21,133 @@ class FingerspotService
     {
         $this->gajiTambahanService = new GajiTambahanService();
     }
+
+    /**
+     * ============================
+     * TAMBAHAN METHOD (STUBS)
+     * ============================
+     * Catatan:
+     * - Method ini ditambahkan agar sesuai dengan pemanggilan di Controller.
+     * - Silakan isi implementasi real (HTTP/SDK) ke device jika sudah siap.
+     */
+
+    /**
+     * Ambil user info dari device.
+     * @param string|null $pin null = ambil semua user
+     * @return array
+     */
+    public function getUserInfo(string $pin = null): array
+    {
+        // TODO: Ganti dengan panggilan nyata ke API/SDK device
+        if ($pin) {
+            return [['PIN' => $pin, 'Name' => 'Dummy User']];
+        }
+        return [
+            ['PIN' => '00001', 'Name' => 'User Satu'],
+            ['PIN' => '00002', 'Name' => 'User Dua'],
+        ];
+    }
+
+    /**
+     * Sinkronkan 1 karyawan ke device (Set Userinfo).
+     * @return array hasil stub
+     */
+    public function syncUserToDevice(Karyawan $karyawan): array
+    {
+        // TODO: Ganti dengan panggilan nyata ke API/SDK device
+        return [
+            'success' => true,
+            'pin' => $karyawan->pin_fingerprint,
+            'name' => $karyawan->nama_lengkap,
+            'message' => 'Synced (stub)',
+        ];
+    }
+
+    /**
+     * Hapus user dari device (Delete Userinfo).
+     * @return array|bool
+     */
+    public function deleteUserInfo(string $pin)
+    {
+        // TODO: Ganti dengan panggilan nyata ke API/SDK device
+        return ['success' => true, 'pin' => $pin, 'message' => 'Deleted (stub)'];
+    }
+
+    /**
+     * Sinkronkan semua user aktif ke device.
+     * @return array ringkasan hasil
+     */
+    public function syncAllUsersToDevice(): array
+    {
+        $results = [];
+        $errors = [];
+        $success = 0;
+
+        $karyawans = Karyawan::whereNotNull('pin_fingerprint')
+            ->where('status', 'Aktif')
+            ->get();
+
+        foreach ($karyawans as $k) {
+            try {
+                $r = $this->syncUserToDevice($k);
+                $results[] = ['pin' => $k->pin_fingerprint, 'result' => $r];
+                $success++;
+            } catch (\Throwable $e) {
+                $errors[] = ['pin' => $k->pin_fingerprint, 'error' => $e->getMessage()];
+            }
+        }
+
+        return [
+            'success_count' => $success,
+            'error_count'   => count($errors),
+            'results'       => $results,
+            'errors'        => $errors,
+        ];
+    }
+
+    /**
+     * Set waktu/timezone perangkat.
+     * @return bool
+     */
+    public function setDeviceTime(): bool
+    {
+        // TODO: Panggil API device, misal kirim now('Asia/Jakarta')
+        // Http::post($url, ['datetime' => now('Asia/Jakarta')->format('Y-m-d H:i:s')]);
+        return true; // stub
+    }
+
+    /**
+     * Restart perangkat.
+     * @return bool
+     */
+    public function restartDevice(): bool
+    {
+        // TODO: Panggil API device untuk restart
+        return true; // stub
+    }
+
+    /**
+     * Import dari API device (rentang tanggal) dan simpan ke AttendanceLog.
+     * Disediakan agar panggilan importAndSaveAttlog($start, $end) di controller tidak error.
+     */
+    public function importAndSaveAttlog($startDate, $endDate): array
+    {
+        // TODO: Implementasi real: tarik attlog via API/SDK lalu simpan.
+        // Di stub ini, kita hanya mengembalikan struktur standar.
+        return [
+            'success'     => true,
+            'imported'    => 0,
+            'total_found' => 0,
+            'errors'      => [],
+            'range'       => [$startDate, $endDate],
+        ];
+    }
+
+    /**
+     * ============================
+     * FUNGSI-FUNGSI EXISTING (TETAP)
+     * ============================
+     */
 
     /**
      * Process unprocessed attendance logs into absensi records

@@ -44,25 +44,26 @@ class RiwayatGaji extends Model
 
     // Generate periode string berdasarkan range tanggal
     public function generatePeriodeString()
-    {
-        if (!$this->periode_mulai || !$this->periode_selesai) {
-            return $this->periode; // fallback ke format lama
-        }
-
-        $start = $this->periode_mulai;
-        $end = $this->periode_selesai;
-
-        switch ($this->tipe_periode) {
-            case 'harian':
-                return $start->format('d M Y');
-            case 'mingguan':
-                return $start->format('d M') . ' - ' . $end->format('d M Y');
-            case 'bulanan':
-                return $start->format('F Y');
-            default:
-                return $this->periode;
-        }
+{
+    if (!$this->periode_mulai || !$this->periode_selesai) {
+        return $this->periode; // fallback
     }
+
+    $start = Carbon::parse($this->periode_mulai);
+    $end   = Carbon::parse($this->periode_selesai);
+
+    switch ($this->tipe_periode) {
+        case 'harian':
+            return $start->format('d M Y');
+        case 'mingguan':
+            return $start->format('d M') . ' - ' . $end->format('d M Y');
+        case 'bulanan':
+            return $start->format('F Y');
+        default:
+            return $this->periode;
+    }
+}
+
 
     // app/Models/RiwayatGaji.php
     public function getPeriodeLabelAttribute()

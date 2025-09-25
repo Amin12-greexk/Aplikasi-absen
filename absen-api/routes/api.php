@@ -228,7 +228,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // FINGERSPOT DEVICE INTEGRATION
     // ========================================
     
-    Route::prefix('fingerspot')->group(function () {
+    Route::prefix('fingerprint')->group(function () {
         Route::get('/status', [FingerspotIntegrationController::class, 'getDeviceStatus']);
         Route::get('/userinfo', [FingerspotIntegrationController::class, 'getUserInfo']);
         Route::post('/register-user', [FingerspotIntegrationController::class, 'registerUser']);
@@ -292,23 +292,51 @@ Route::middleware('auth:sanctum')->group(function () {
     // ========================================
     
     Route::prefix('absensi')->group(function () {
-        Route::get('/', function(Request $request) {
-            $query = Absensi::with(['karyawan.departemenSaatIni']);
-            
-            if ($request->karyawan_id) {
-                $query->where('karyawan_id', $request->karyawan_id);
-            }
-            
-            if ($request->start_date) {
-                $query->whereDate('tanggal_absensi', '>=', $request->start_date);
-            }
-            
-            if ($request->end_date) {
-                $query->whereDate('tanggal_absensi', '<=', $request->end_date);
-            }
-            
-            return response()->json($query->orderBy('tanggal_absensi', 'desc')->paginate(20));
-        });
+    Route::get('/', function(Request $request) {
+        // Relasi karyawan + departemen
+        $query = Absensi::with(['karyawan.departemenSaatIni']);
+
+        // Filter rentang tanggal (tetap dukung start_date & end_date dari sebelumnya)
+        if ($request->start_date) {
+            $query->whereDate('tanggal_absensi', '>=', $request->start_date);
+        }
+        if ($request->end_date) {
+            $query->whereDate('tanggal_absensi', '<=', $request->end_date);
+        }
+
+        // Filter single tanggal (front‑end mengirim 'tanggal_absensi')
+        if ($request->tanggal_absensi) {
+            $query->whereDate('tanggal_absensi', $request->tanggal_absensi);
+        }
+
+        // Filter berdasarkan departemen (nama atau ID)
+        if ($request->departemen) {
+            // Jika front‑end mengirim nama departemen:
+            $query->whereHas('karyawan.departemenSaatIni', function($q) use ($request) {
+                $q->where('nama_departemen', $request->departemen);
+            });
+            // Atau jika ingin dukung ID: $q->where('departemen_id', $request->departemen_id);
+        }
+
+        // Filter berdasarkan status absensi
+        if ($request->status && $request->status !== 'all') {
+            $query->where('status', $request->status);
+        }
+
+        // Pencarian nama atau NIK
+        if ($request->q) {
+            $q = strtolower($request->q);
+            $query->whereHas('karyawan', function($k) use ($q) {
+                $k->whereRaw('LOWER(nama_lengkap) LIKE ?', ["%{$q}%"])
+                  ->orWhereRaw('LOWER(nik) LIKE ?', ["%{$q}%"]);
+            });
+        }
+
+        // Kembalikan tanpa paginate untuk kemudahan front‑end
+        return response()->json(
+            $query->orderBy('tanggal_absensi', 'desc')->get()
+        );
+    });
         
         Route::get('/{absensi_id}', function($absensi_id) {
             $absensi = Absensi::with(['karyawan.departemenSaatIni', 'karyawan.jabatanSaatIni'])
